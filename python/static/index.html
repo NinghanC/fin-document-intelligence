@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal/Enterprise Private Knowledge Base Management System — Agent Knowledge Hub</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ═══════════════ Decorative Background Blobs ═══════════════ -->
+<div class="bg-blob bg-blob--1"></div>
+<div class="bg-blob bg-blob--2"></div>
+<div class="bg-blob bg-blob--3"></div>
+
+<div id="app-wrapper">
+
+  <!-- ═══════════════ Brand Header — Glass Morphism ═══════════════ -->
+  <header class="brand-header animate-fade-in-up">
+    <div class="brand-left">
+      <div class="brand-logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect width="24" height="24" rx="8" fill="url(#logoGrad)"/>
+          <path d="M7 9l5 5 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs><linearGradient id="logoGrad" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#2563eb"/><stop offset="1" stop-color="#4f46e5"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="brand-info">
+        <h1 class="brand-title">Personal/Enterprise Private Knowledge Base Management System</h1>
+        <p class="brand-tagline">Multi-agent collaboration · knowledge graph reasoning · hybrid RAG retrieval</p>
+      </div>
+    </div>
+    <div class="brand-status">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-text" id="statusText">Connecting...</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════ Tab Navigation ═══════════════ -->
+  <nav class="tab-nav animate-fade-in-up" style="animation-delay: 0.05s;">
+    <button class="tab-btn active" data-tab="qa">
+      <svg class="tab-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      Intelligent QA
+    </button>
+    <button class="tab-btn" data-tab="upload">
+      <svg class="tab-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Document Ingestion
+    </button>
+    <button class="tab-btn" data-tab="dashboard">
+      <svg class="tab-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      System Overview
+    </button>
+  </nav>
+
+  <!-- ═══════════════ Q&A Panel ═══════════════ -->
+  <section id="panel-qa" class="panel card animate-fade-in-up" style="animation-delay: 0.1s;">
+    <div class="card-header">
+      <div class="card-header-icon icon-chat">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      </div>
+      <div>
+        <h2 class="card-header-title">Intelligent QA</h2>
+        <p class="card-header-desc">Deep reasoning QA based on knowledge graphs and hybrid RAG</p>
+      </div>
+    </div>
+
+    <div class="chat-container" id="chatContainer">
+      <div class="chat-msg agent">
+        <div class="chat-avatar chat-avatar--agent">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        <div class="chat-body">
+          <div class="chat-bubble chat-bubble--agent">
+            <p>Hello! I am the <strong>Personal/Enterprise Private Knowledge Base Management Assistant</strong>.</p>
+            <p class="chat-bubble-sub">After you upload documents, I can answer questions using hybrid retrieval and reasoning over document content and the knowledge graph.</p>
+          </div>
+          <div class="chat-meta">
+            <span class="chat-tag chat-tag--ai">AI Assistant</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div class="chat-input-wrapper">
+        <input
+          class="chat-input"
+          id="qaInput"
+          placeholder="Enter your question, for example: What is this document about?"
+          autocomplete="off"
+        >
+        <button class="chat-send-btn" id="qaSendBtn" title="Send message">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <p class="chat-input-hint">
+        <kbd>Ctrl</kbd> + <kbd>K</kbd> quick focus · Enter send
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Upload Panel ═══════════════ -->
+  <section id="panel-upload" class="panel card hidden animate-fade-in-up" style="animation-delay: 0.1s;">
+    <div class="card-header">
+      <div class="card-header-icon icon-upload">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+      </div>
+      <div>
+        <h2 class="card-header-title">Document Ingestion</h2>
+        <p class="card-header-desc">Upload documents to automatically parse, vectorize, and build the knowledge graph</p>
+      </div>
+    </div>
+
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-zone-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div class="upload-zone-text">Click or drag files here to upload</div>
+      <div class="upload-zone-hint">Supports PDF · TXT · DOCX · Markdown · HTML · PPTX formats</div>
+      <input type="file" id="fileInput" accept=".pdf,.txt,.docx,.md,.html,.pptx" multiple>
+    </div>
+
+    <div class="upload-progress" id="uploadProgress"></div>
+    <div class="doc-list" id="docList"></div>
+  </section>
+
+  <!-- ═══════════════ Dashboard Panel ═══════════════ -->
+  <section id="panel-dashboard" class="panel card hidden animate-fade-in-up" style="animation-delay: 0.1s;">
+    <div class="card-header">
+      <div class="card-header-icon icon-dashboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      </div>
+      <div>
+        <h2 class="card-header-title">System Overview</h2>
+        <p class="card-header-desc">Real-time monitoring of knowledge base status and data metrics</p>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card stat-card--blue">
+        <div class="stat-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        </div>
+        <div class="stat-value" id="statVectors">--</div>
+        <div class="stat-label">Vector indexes</div>
+      </div>
+      <div class="stat-card stat-card--indigo">
+        <div class="stat-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+        </div>
+        <div class="stat-value" id="statEntities">--</div>
+        <div class="stat-label">Knowledge graph entities</div>
+      </div>
+      <div class="stat-card stat-card--purple">
+        <div class="stat-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <div class="stat-value" id="statRelations">--</div>
+        <div class="stat-label">Knowledge graph relations</div>
+      </div>
+      <div class="stat-card stat-card--emerald">
+        <div class="stat-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="stat-value" id="statBackend">--</div>
+        <div class="stat-label">Vector store backend</div>
+      </div>
+    </div>
+
+    <div class="dashboard-actions">
+      <button class="btn btn-primary btn-sm" id="refreshStatsBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Refresh data
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Footer ═══════════════ -->
+  <footer class="app-footer animate-fade-in-up" style="animation-delay: 0.15s;">
+    <div class="footer-content">
+      <span class="footer-brand">Agent Knowledge Hub</span>
+      <span class="footer-sep">·</span>
+      <span>LangGraph + Neo4j + ChromaDB</span>
+      <span class="footer-sep">·</span>
+      <span>Cloud-ready for AWS / Azure / Databricks</span>
+    </div>
+  </footer>
+
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
