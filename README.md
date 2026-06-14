@@ -1,12 +1,12 @@
 # FinSight Assistant
 
-FinSight Assistant is a private document intelligence assistant built for a friend working at a financial services company. The goal is to help analysts and operations teams search internal documents, trace answers back to source material, and keep the knowledge base updated as reports and policies change.
+FinSight Assistant is a private document intelligence assistant designed for financial services teams. The goal is to help analysts, operations teams, and risk reviewers search internal documents, trace answers back to source material, and keep the knowledge base updated as reports and policies change.
 
-This repository is a realistic prototype of that solution: it shows the architecture, workflows, and integration points needed for a financial document assistant, while keeping the implementation small enough to run locally with Docker Compose.
+This repository is a realistic prototype of that solution. It shows the architecture, workflows, and integration points needed for a financial document assistant, while keeping the implementation small enough to run locally with Docker Compose.
 
 ## Business Context
 
-The original problem came from a familiar financial-company workflow. Teams had useful knowledge scattered across:
+The target workflow is common in financial organizations. Teams often have useful knowledge scattered across:
 
 - investment memos and research notes
 - policy and compliance documents
@@ -173,10 +173,10 @@ Not production-ready yet:
 Copy the environment template:
 
 ```bash
-cp python/.env.example python/.env
+cp backend/.env.example backend/.env
 ```
 
-Edit `python/.env` with a real model provider endpoint:
+Edit `backend/.env` with a real model provider endpoint:
 
 ```env
 OPENAI_API_KEY=your-key
@@ -238,7 +238,7 @@ neo4j / password
 ## Project Layout
 
 ```text
-python/
+backend/
   agents/          Parser, extractor, QA, and update agents
   api/             FastAPI application
   config/          Environment-based settings

@@ -29,6 +29,9 @@ docker-compose.override.yml
 
 # ── Data & Uploads ────────────────
 uploads/
+backend/uploads/
+backend/chroma_data/
+.uv-cache/
 *.sqlite
 *.db
 data/
@@ -37,7 +40,7 @@ data/
 *.log
 logs/
 
-# ── Secrets (永远不要提交) ────────
+# ── Secrets ───────────────────────
 *.pem
 *.key
 credentials.json

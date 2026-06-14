@@ -50,22 +50,22 @@ services:
     depends_on:
       - zookeeper
 
-  # ── Python API service ───────────────────────────
+  # ── Backend API service ──────────────────────────
   api:
     build:
-      context: ./python
+      context: ./backend
       dockerfile: Dockerfile
     container_name: agenthub-api
     ports:
       - "8080:8080"
     env_file:
-      - ./python/.env
+      - ./backend/.env
     depends_on:
       - neo4j
       - chromadb
       - kafka
     volumes:
-      - ./python:/app
+      - ./backend:/app
       - uploads:/app/uploads
 
 volumes:
