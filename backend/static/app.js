@@ -1,16 +1,16 @@
-/* ═══════════════════════════════════════════════════════════════════
-   Agent Knowledge Hub — Premium Frontend App
-   ═══════════════════════════════════════════════════════════════════ */
+/* 
+   FinSight Assistant frontend app
+    */
 
 const API = '/api';
 
-/* ════════════════════ State ════════════════════ */
+/*  State  */
 const state = {
   uploadedDocs: [],
   asking: false,
 };
 
-/* ════════════════════ DOM refs ════════════════════ */
+/*  DOM refs  */
 const $ = (s) => document.querySelector(s);
 
 const dom = {
@@ -32,14 +32,14 @@ const dom = {
   refreshStatsBtn: $('#refreshStatsBtn'),
 };
 
-/* ════════════════════ Health Check ════════════════════ */
+/*  Health Check  */
 async function checkHealth() {
   try {
     const r = await fetch(`${API}/health`);
     const d = await r.json();
     if (d.status === 'ok') {
       dom.statusDot.classList.remove('offline');
-      dom.statusText.textContent = d.service || 'System healthy';
+      dom.statusText.textContent = 'Online';
     }
   } catch {
     dom.statusDot.classList.add('offline');
@@ -49,7 +49,7 @@ async function checkHealth() {
 checkHealth();
 setInterval(checkHealth, 15000);
 
-/* ════════════════════ Tab Switching ════════════════════ */
+/*  Tab Switching  */
 dom.tabs.forEach(btn => {
   btn.addEventListener('click', () => {
     dom.tabs.forEach(b => b.classList.remove('active'));
@@ -65,7 +65,7 @@ dom.tabs.forEach(btn => {
   });
 });
 
-/* ════════════════════ Q&A ════════════════════ */
+/*  Q&A  */
 dom.qaSendBtn.addEventListener('click', sendQuestion);
 dom.qaInput.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuestion(); }
@@ -198,7 +198,7 @@ function appendMessage(role, content, meta) {
       src.innerHTML = '<strong>Sources</strong> &nbsp;' +
         meta.sources.map((s, i) =>
           `[${i + 1}] ${escapeHtml(s.source)} (${(s.score * 100).toFixed(0)}%)`
-        ).join(' &nbsp;·&nbsp; ');
+        ).join(' &nbsp;-&nbsp; ');
       body.appendChild(src);
     }
 
@@ -233,7 +233,7 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-/* ════════════════════ Upload ════════════════════ */
+/*  Upload  */
 dom.uploadZone.addEventListener('click', () => dom.fileInput.click());
 dom.fileInput.addEventListener('change', () => uploadFiles(dom.fileInput.files));
 
@@ -272,7 +272,7 @@ async function uploadFiles(fileList) {
       addDocToList(file.name, data);
       progress.textContent = `Done: ${file.name} (${data.chunks_count} text chunks, ${data.entities_count} entities, ${data.relations_count} relations)`;
     } catch (err) {
-      progress.textContent = `Failed: ${file.name} — ${err.message}`;
+      progress.textContent = `Failed: ${file.name} - ${err.message}`;
       progress.classList.add('error');
     }
   }
@@ -289,13 +289,13 @@ function addDocToList(name, data) {
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--emerald-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
     </span>
     <span class="doc-name">${escapeHtml(name)}</span>
-    <span class="doc-meta">${data.chunks_count} chunks · ${data.entities_count} entities · ${data.relations_count} relations</span>
+    <span class="doc-meta">${data.chunks_count} chunks - ${data.entities_count} entities - ${data.relations_count} relations</span>
   `;
   dom.docList.prepend(item);
   state.uploadedDocs.push({ name, data });
 }
 
-/* ════════════════════ Dashboard ════════════════════ */
+/*  Dashboard  */
 async function loadStats() {
   // Reset to loading state
   ['statVectors', 'statEntities', 'statRelations', 'statBackend'].forEach(id => {
@@ -349,7 +349,7 @@ function animateValue(el, target) {
 
 dom.refreshStatsBtn.addEventListener('click', loadStats);
 
-/* ════════════════════ Keyboard Shortcuts ════════════════════ */
+/*  Keyboard Shortcuts  */
 document.addEventListener('keydown', e => {
   // Ctrl+K / Cmd+K: focus QA input
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {

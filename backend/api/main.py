@@ -51,8 +51,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="com_agent_chat — Multi-Agent Knowledge Orchestration Management System",
-    description="Enterprise knowledge management API with multimodal RAG, knowledge graphs, and incremental updates",
+    title="FinSight Assistant",
+    description="Financial document intelligence API with hybrid RAG, knowledge graphs, and incremental updates",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -224,7 +224,7 @@ async def trigger_update(req: UpdateRequest):
 
 @app.get("/api/health", tags=["System Administration"])
 async def health():
-    return {"status": "ok", "service": "com_agent_chat"}
+    return {"status": "ok", "service": "finsight-assistant"}
 
 
 if __name__ == "__main__":

@@ -175,7 +175,7 @@ class DocParserAgent:
         try:
             import pytesseract
             from PIL import Image
-            return pytesseract.image_to_string(Image.open(file_path), lang="chi_sim+eng")
+            return pytesseract.image_to_string(Image.open(file_path), lang="eng")
         except Exception:
             return ""
 

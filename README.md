@@ -4,6 +4,26 @@ FinSight Assistant is a private document intelligence assistant for financial se
 
 This repository is a realistic prototype of that system. It demonstrates the architecture, code structure, ingestion flow, hybrid retrieval design, and deployment shape for a financial-document assistant, while staying small enough to run locally with Docker Compose.
 
+## Prototype Scope
+
+This public repository is a sanitized prototype adapted from an internal document-intelligence architecture. The README describes the target architecture and behavior of that internal project, while the code in this repository keeps the same module boundaries and workflows with sensitive production details removed.
+
+The public version is intended to show engineering design, service decomposition, and end-to-end data flow. It is not a full production export of the internal system.
+
+The following production-specific components have been removed, simplified, or replaced with local equivalents:
+
+- proprietary document samples, schemas, prompts, and evaluation datasets
+- cloud deployment modules, private infrastructure identifiers, and environment-specific configuration
+- authentication, authorization, tenant isolation, and internal access-control policies
+- production observability, alerting, audit logging, and compliance reporting integrations
+- internal background job infrastructure and managed ingestion queues
+- production vector-store persistence, indexing strategy, and retrieval tuning
+- complete graph lineage metadata, source-policy mapping, and regulated workflow hooks
+- provider-specific model routing, fallback policies, and cost-control configuration
+- benchmark results, business metrics, and internal performance traces
+
+Because of this sanitization, a few implementation details in the public code are intentionally lighter than the architecture described here. For example, the public vector-store layer keeps the ChromaDB path defensive, the `GraphRAGPipeline` is present as a service-level component but is not fully wired into the main QA endpoint, and some source lineage fields are reduced compared with the internal implementation.
+
 ## What Problem It Solves
 
 Financial teams often work with knowledge spread across:
@@ -45,25 +65,46 @@ This hybrid design is more useful for financial workflows than a pure vector-sea
 ## Architecture
 
 ```text
-Financial analyst / operations user
-              |
-        Web UI / REST API
-              |
-          FastAPI service
-              |
-      LangGraph orchestration
-              |
-  +-----------+------------+
-  |                        |
-Parser / extractor      QA / update agents
-  |                        |
-  +-------> Retrieval layer <------+
-              |                    |
-        Vector store          Neo4j graph
-        Chroma/PGVector       Entities/relations
-              |
-      Cloud LLM provider
-  Azure OpenAI / AWS Bedrock / Databricks
++------------------------------------------------+
+| User Interface Layer                           |
+| Web UI (SPA, 3 tabs)                           |
+| REST API (FastAPI, 7 endpoints)                |
+| Swagger / OpenAPI documentation                |
++------------------------+-----------------------+
+                         |
+                         | HTTP
+                         v
++------------------------------------------------+
+| Orchestration Layer (LangGraph)                |
+|                                                |
+|   +----------------------------------------+   |
+|   | Ingest Pipeline                        |   |
+|   | parse -> extract -> store              |   |
+|   +----------------------------------------+   |
+|                                                |
+|   +----------------------------------------+   |
+|   | QA Pipeline                            |   |
+|   | answer -> END                          |   |
+|   +----------------------------------------+   |
+|                                                |
+|   +----------------------------------------+   |
+|   | Update Pipeline                        |   |
+|   | process -> retry -> END                |   |
+|   +----------------------------------------+   |
++------------------------+-----------------------+
+                         |
+          +--------------+--------------+
+          |              |              |
+          v              v              v
++------------------------+ +-----------------------+ +----------------------+
+| Agent Layer            | | Service Layer         | | Infrastructure Layer |
+|                        | |                       | |                      |
+| DocParserAgent         | | VectorStoreService    | | ChromaDB / PGVector  |
+| KnowledgeExtractAgent  | | KnowledgeGraphService | | Neo4j                |
+| QAAgent                | | GraphRAGPipeline      | | Kafka                |
+| KnowledgeUpdateAgent   | | CDCProcessor          | | EmbeddingWorker      |
+|                        | | MultimodalService     | | (subprocess)         |
++------------------------+ +-----------------------+ +----------------------+
 ```
 
 ### Runtime Services
@@ -118,6 +159,93 @@ Generated runtime data is intentionally excluded from Git:
 - `.uv-cache/`
 
 ## Core Workflows
+
+### End-to-End Fund Example
+
+The following example shows the full path from a fund document upload to a grounded answer.
+
+```text
+Input
+  Fund operations team uploads:
+  "Q4_global_income_fund_risk_report.pdf"
+        |
+        v
++-------------------------------------------------------------+
+| FastAPI upload_document()                                   |
+| file = save_path                                            |
+| ingest_wf.ainvoke({"file_paths": [file]})                   |
++-------------------------------------------------------------+
+        |
+        v
++-------------------------------------------------------------+
+| parse_documents(state)                                      |
+| DocParserAgent.parse_batch() -> chunks                      |
+| state update: chunks = [DocumentChunk x 45]                 |
+| Example content: fund exposure, liquidity terms, risk notes |
++-------------------------------------------------------------+
+        |
+        v
++-------------------------------------------------------------+
+| extract_knowledge(state)                                    |
+| KnowledgeExtractAgent.extract() -> extractions              |
+| state update: extractions = [ExtractionResult ...]          |
+| Example entities:                                           |
+|   Global Income Fund, liquidity constraint, bond sleeve,    |
+|   emerging-market debt, redemption gate                     |
++-------------------------------------------------------------+
+        |
+        v
+        +------------------------------+------------------------------+
+        |                              |                              |
+        v                              v                              |
++-----------------------------+  +------------------------------------+
+| store_vectors(state)        |  | store_graph(state)                 |
+| VectorStoreService          |  | KnowledgeGraphService              |
+| add_chunks(chunks)          |  | upsert_entity() / add_relation()   |
+| vectors_stored: 45          |  | entities_stored: 23                |
++-----------------------------+  +------------------------------------+
+        |                              |
+        +--------------+---------------+
+                       |
+                       v
++-------------------------------------------------------------+
+| HTTP Response                                                |
+| IngestResponse                                               |
+| file_name: "Q4_global_income_fund_risk_report.pdf"          |
+| chunks_count: 45                                             |
+| entities_count: 23                                           |
+| relations_count: 18                                          |
++-------------------------------------------------------------+
+
+User Question
+  POST /api/qa/ask
+  {"question": "Which funds mention liquidity constraints?"}
+        |
+        v
++-------------------------------------------------------------+
+| process_question(state)                                     |
+| QAAgent.answer() -> QAResult                                |
+|                                                             |
+| Internal steps:                                             |
+| 1. classify_intent -> factoid / analytical                  |
+| 2. rewrite_query -> queries + entities                      |
+| 3. retrieve from vector store                               |
+| 4. retrieve from knowledge graph                            |
+| 5. hybrid_rerank(vector, graph)                             |
+| 6. generate_answer with cited context                       |
++-------------------------------------------------------------+
+        |
+        v
++-------------------------------------------------------------+
+| HTTP Response                                                |
+| QuestionResponse                                             |
+| answer: "Global Income Fund mentions liquidity constraints   |
+|          in the redemption and bond sleeve risk sections."   |
+| confidence: 0.87                                             |
+| sources: [source, score, retrieval_type, snippet]            |
+| reasoning_steps: [...]                                      |
++-------------------------------------------------------------+
+```
 
 ### 1. Document Ingestion
 
@@ -208,7 +336,7 @@ The current vector-store implementation is intentionally defensive:
 - ChromaDB operations are isolated through a thread pool.
 - ChromaDB search returns an empty result in async mode to avoid unstable C-extension behavior.
 - `add_chunks()` currently tracks counts rather than making full ChromaDB writes.
-- PGVector remains the more direct path for real vector retrieval.
+- PGVector is the intended production-oriented retrieval path once full vector writes are enabled.
 
 This means the architecture is in place, but production-grade vector persistence and retrieval still need hardening.
 
@@ -392,8 +520,10 @@ http://localhost:7474
 Local Neo4j credentials:
 
 ```text
-neo4j / password
+neo4j / local-password
 ```
+
+These credentials are local demo defaults only.
 
 ## Local Development
 

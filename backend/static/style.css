@@ -1,12 +1,11 @@
-/* ═══════════════════════════════════════════════════════════════════
-   Premium Design System — Agent Knowledge Hub
+/* 
+   FinSight Assistant frontend styles
    Palette: Indigo/Blue primary + multi-accent per feature
-   Based on interview-agent-ui design system
-   ═══════════════════════════════════════════════════════════════════ */
+    */
 
-/* ── Design Tokens ───────────────────────────────────────────── */
+/*  Design Tokens  */
 :root {
-  /* Primary palette — Indigo/Blue */
+  /* Primary palette  Indigo/Blue */
   --blue-50: #eff6ff;
   --blue-100: #dbeafe;
   --blue-200: #bfdbfe;
@@ -104,7 +103,7 @@
   --duration-slow: 500ms;
 }
 
-/* ── Reset ────────────────────────────────────────────────────── */
+/*  Reset  */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -118,13 +117,13 @@ body {
   overflow-x: hidden;
 }
 
-/* ── Scrollbar ────────────────────────────────────────────────── */
+/*  Scrollbar  */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--slate-300); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--slate-400); }
 
-/* ════════════════════ Background Blobs ═════════════════════════ */
+/*  Background Blobs  */
 .bg-blob {
   position: fixed;
   border-radius: 50%;
@@ -180,7 +179,7 @@ body {
   50% { transform: translate(30px, 25px) scale(1.04); }
 }
 
-/* ════════════════════ Layout ════════════════════════════════════ */
+/*  Layout  */
 #app-wrapper {
   position: relative;
   z-index: 1;
@@ -192,7 +191,7 @@ body {
   gap: 20px;
 }
 
-/* ════════════════════ Brand Header ═════════════════════════════ */
+/*  Brand Header  */
 .brand-header {
   display: flex;
   align-items: center;
@@ -282,7 +281,7 @@ body {
   50% { opacity: 0.6; box-shadow: 0 0 0 8px rgba(16,185,129,0); }
 }
 
-/* ════════════════════ Tab Navigation ════════════════════════════ */
+/*  Tab Navigation  */
 .tab-nav {
   display: flex;
   gap: 4px;
@@ -339,7 +338,7 @@ body {
   color: var(--indigo-600);
 }
 
-/* ════════════════════ Cards / Panels ════════════════════════════ */
+/*  Cards / Panels  */
 .panel {
   background: var(--surface-card);
   backdrop-filter: blur(20px) saturate(180%);
@@ -402,7 +401,7 @@ body {
   font-weight: 400;
 }
 
-/* ════════════════════ Stats Grid ════════════════════════════════ */
+/*  Stats Grid  */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -488,7 +487,7 @@ body {
   gap: 10px;
 }
 
-/* ════════════════════ Buttons ═══════════════════════════════════ */
+/*  Buttons  */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -568,7 +567,7 @@ body {
   pointer-events: none;
 }
 
-/* ════════════════════ Upload Zone ═══════════════════════════════ */
+/*  Upload Zone  */
 .upload-zone {
   border: 2px dashed var(--slate-200);
   border-radius: var(--radius-xl);
@@ -645,7 +644,7 @@ body {
   border-color: var(--red-100);
 }
 
-/* ════════════════════ Document List ═════════════════════════════ */
+/*  Document List  */
 .doc-list {
   display: flex;
   flex-direction: column;
@@ -689,7 +688,7 @@ body {
   font-weight: 500;
 }
 
-/* ════════════════════ Chat ══════════════════════════════════════ */
+/*  Chat  */
 .chat-container {
   display: flex;
   flex-direction: column;
@@ -850,7 +849,7 @@ body {
   border: 1px solid rgba(79,70,229,0.1);
 }
 
-/* ════════════════════ Chat Input ════════════════════════════════ */
+/*  Chat Input  */
 .chat-input-area {
   margin-top: 20px;
 }
@@ -939,7 +938,7 @@ body {
   color: var(--text-secondary);
 }
 
-/* ════════════════════ Loading Spinner ═══════════════════════════ */
+/*  Loading Spinner  */
 .spinner {
   width: 18px;
   height: 18px;
@@ -979,7 +978,7 @@ body {
   30% { transform: translateY(-8px); opacity: 1; }
 }
 
-/* ════════════════════ Footer ════════════════════════════════════ */
+/*  Footer  */
 .app-footer {
   text-align: center;
   padding: 4px 0;
@@ -1006,7 +1005,7 @@ body {
   font-weight: 400;
 }
 
-/* ════════════════════ Animations ════════════════════════════════ */
+/*  Animations  */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -1038,7 +1037,7 @@ body {
   }
 }
 
-/* ── Utility animation classes ── */
+/*  Utility animation classes  */
 .animate-fade-in-up {
   animation: fadeInUp 0.5s var(--ease-out) forwards;
   opacity: 0;
@@ -1048,12 +1047,12 @@ body {
   animation: scaleIn 0.3s var(--ease-out) forwards;
 }
 
-/* ════════════════════ Utility ═══════════════════════════════════ */
+/*  Utility  */
 .hidden {
   display: none !important;
 }
 
-/* ════════════════════ Responsive ════════════════════════════════ */
+/*  Responsive  */
 @media (max-width: 768px) {
   #app-wrapper {
     padding: 16px 12px 32px;

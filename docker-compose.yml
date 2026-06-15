@@ -1,15 +1,14 @@
 version: "3.9"
 
 services:
-  # ── Neo4j knowledge graph database ──────────────────────
   neo4j:
     image: neo4j:5.28-community
-    container_name: agenthub-neo4j
+    container_name: finsight-neo4j
     ports:
-      - "7474:7474"   # Web UI
-      - "7687:7687"   # Bolt
+      - "7474:7474"
+      - "7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/password
+      NEO4J_AUTH: neo4j/local-password
       NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - neo4j_data:/data
@@ -19,10 +18,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── ChromaDB vector database ───────────────────────
   chromadb:
     image: chromadb/chroma:0.6.3
-    container_name: agenthub-chromadb
+    container_name: finsight-chromadb
     ports:
       - "8000:8000"
     volumes:
@@ -30,32 +28,31 @@ services:
     environment:
       ANONYMIZED_TELEMETRY: "false"
 
-  # ── Kafka (CDC message queue) ──────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.0
-    container_name: agenthub-zookeeper
+    container_name: finsight-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
 
   kafka:
     image: confluentinc/cp-kafka:7.7.0
-    container_name: agenthub-kafka
+    container_name: finsight-kafka
     ports:
       - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
       - zookeeper
 
-  # ── Backend API service ──────────────────────────
   api:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: agenthub-api
+    container_name: finsight-api
     ports:
       - "8080:8080"
     env_file:

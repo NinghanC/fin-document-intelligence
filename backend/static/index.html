@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Personal/Enterprise Private Knowledge Base Management System — Agent Knowledge Hub</title>
+<title>FinSight Assistant</title>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,14 +11,14 @@
 </head>
 <body>
 
-<!-- ═══════════════ Decorative Background Blobs ═══════════════ -->
+<!--  Decorative Background Blobs  -->
 <div class="bg-blob bg-blob--1"></div>
 <div class="bg-blob bg-blob--2"></div>
 <div class="bg-blob bg-blob--3"></div>
 
 <div id="app-wrapper">
 
-  <!-- ═══════════════ Brand Header — Glass Morphism ═══════════════ -->
+  <!--  Brand Header  Glass Morphism  -->
   <header class="brand-header animate-fade-in-up">
     <div class="brand-left">
       <div class="brand-logo">
@@ -29,8 +29,8 @@
         </svg>
       </div>
       <div class="brand-info">
-        <h1 class="brand-title">Personal/Enterprise Private Knowledge Base Management System</h1>
-        <p class="brand-tagline">Multi-agent collaboration · knowledge graph reasoning · hybrid RAG retrieval</p>
+        <h1 class="brand-title">FinSight Assistant</h1>
+        <p class="brand-tagline">Financial document intelligence - knowledge graph reasoning - hybrid RAG retrieval</p>
       </div>
     </div>
     <div class="brand-status">
@@ -39,7 +39,7 @@
     </div>
   </header>
 
-  <!-- ═══════════════ Tab Navigation ═══════════════ -->
+  <!--  Tab Navigation  -->
   <nav class="tab-nav animate-fade-in-up" style="animation-delay: 0.05s;">
     <button class="tab-btn active" data-tab="qa">
       <svg class="tab-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
@@ -55,7 +55,7 @@
     </button>
   </nav>
 
-  <!-- ═══════════════ Q&A Panel ═══════════════ -->
+  <!--  Q&A Panel  -->
   <section id="panel-qa" class="panel card animate-fade-in-up" style="animation-delay: 0.1s;">
     <div class="card-header">
       <div class="card-header-icon icon-chat">
@@ -74,7 +74,7 @@
         </div>
         <div class="chat-body">
           <div class="chat-bubble chat-bubble--agent">
-            <p>Hello! I am the <strong>Personal/Enterprise Private Knowledge Base Management Assistant</strong>.</p>
+            <p>Hello! I am the <strong>FinSight Assistant</strong>.</p>
             <p class="chat-bubble-sub">After you upload documents, I can answer questions using hybrid retrieval and reasoning over document content and the knowledge graph.</p>
           </div>
           <div class="chat-meta">
@@ -97,12 +97,12 @@
         </button>
       </div>
       <p class="chat-input-hint">
-        <kbd>Ctrl</kbd> + <kbd>K</kbd> quick focus · Enter send
+        <kbd>Ctrl</kbd> + <kbd>K</kbd> quick focus - Enter send
       </p>
     </div>
   </section>
 
-  <!-- ═══════════════ Upload Panel ═══════════════ -->
+  <!--  Upload Panel  -->
   <section id="panel-upload" class="panel card hidden animate-fade-in-up" style="animation-delay: 0.1s;">
     <div class="card-header">
       <div class="card-header-icon icon-upload">
@@ -119,15 +119,15 @@
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       </div>
       <div class="upload-zone-text">Click or drag files here to upload</div>
-      <div class="upload-zone-hint">Supports PDF · TXT · DOCX · Markdown · HTML · PPTX formats</div>
-      <input type="file" id="fileInput" accept=".pdf,.txt,.docx,.md,.html,.pptx" multiple>
+      <div class="upload-zone-hint">Supports PDF, image, CSV, Excel, TXT, and Markdown formats</div>
+      <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.csv,.xlsx,.xls,.txt,.md" multiple>
     </div>
 
     <div class="upload-progress" id="uploadProgress"></div>
     <div class="doc-list" id="docList"></div>
   </section>
 
-  <!-- ═══════════════ Dashboard Panel ═══════════════ -->
+  <!--  Dashboard Panel  -->
   <section id="panel-dashboard" class="panel card hidden animate-fade-in-up" style="animation-delay: 0.1s;">
     <div class="card-header">
       <div class="card-header-icon icon-dashboard">
@@ -178,13 +178,13 @@
     </div>
   </section>
 
-  <!-- ═══════════════ Footer ═══════════════ -->
+  <!--  Footer  -->
   <footer class="app-footer animate-fade-in-up" style="animation-delay: 0.15s;">
     <div class="footer-content">
-      <span class="footer-brand">Agent Knowledge Hub</span>
-      <span class="footer-sep">·</span>
+      <span class="footer-brand">FinSight Assistant</span>
+      <span class="footer-sep">-</span>
       <span>LangGraph + Neo4j + ChromaDB</span>
-      <span class="footer-sep">·</span>
+      <span class="footer-sep">-</span>
       <span>Cloud-ready for AWS / Azure / Databricks</span>
     </div>
   </footer>

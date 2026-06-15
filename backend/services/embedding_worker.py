@@ -1,6 +1,8 @@
 """
-Embedding worker subprocess — isolates PyTorch/sentence-transformers
-in a separate process to prevent segfaults from crashing the main server.
+Embedding worker subprocess.
+
+This isolates sentence-transformers in a separate process so model-runtime
+errors do not crash the main API server.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ import time
 from typing import Any
 
 
-_MODEL_NAME = "shibing624/text2vec-base-chinese"
+_MODEL_NAME = os.environ.get("LOCAL_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 _DEVICE = "cpu"
 _SHUTDOWN_TIMEOUT = 30
 
