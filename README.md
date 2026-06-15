@@ -1,5 +1,7 @@
 # FinSight Assistant
 
+This repository is an architectural extract of an internal financial document intelligence system. This code demonstrates the structure, design decisions, and integration patterns — not a runnable standalone product.
+
 FinSight Assistant is a private document intelligence assistant designed for financial services teams. The goal is to help analysts, operations teams, and risk reviewers search internal documents, trace answers back to source material, and keep the knowledge base updated as reports and policies change.
 
 This repository is a realistic prototype of that solution. It shows the architecture, workflows, and integration points needed for a financial document assistant, while keeping the implementation small enough to run locally with Docker Compose.
