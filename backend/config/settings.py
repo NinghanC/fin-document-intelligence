@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     chroma_host: str = "localhost"
     chroma_port: int = 8000
     pgvector_dsn: str = "postgresql://postgres:postgres@localhost:5432/knowledge"
+    disable_local_embeddings: bool = False
 
     # Kafka (CDC)
     kafka_bootstrap_servers: str = "localhost:9092"

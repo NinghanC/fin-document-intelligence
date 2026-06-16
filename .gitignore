@@ -32,6 +32,8 @@ uploads/
 backend/uploads/
 backend/chroma_data/
 .uv-cache/
+.uv-python/
+.docker-tmp/
 *.sqlite
 *.db
 data/

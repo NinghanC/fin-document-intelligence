@@ -136,19 +136,75 @@ class VectorStoreService:
     # ── CRUD ─────────────────────────────────────────────────
 
     async def add_chunks(self, chunks: list[DocumentChunk]) -> int:
-        """Vectorize and store document chunks. The chromadb C extension is unstable in async contexts, so only the count is tracked."""
+        """Vectorize and store document chunks."""
         if not chunks or not self.embeddings_available:
             return 0
-        # Track count in memory to avoid chromadb C-extension calls
-        self._stored_count = getattr(self, '_stored_count', 0) + len(chunks)
-        return len(chunks)
+
+        documents = [chunk.content for chunk in chunks]
+        ids = [chunk.chunk_id for chunk in chunks]
+        metadatas = [
+            {
+                **chunk.metadata,
+                "doc_id": chunk.doc_id,
+                "chunk_id": chunk.chunk_id,
+                "source": chunk.metadata.get("source", ""),
+            }
+            for chunk in chunks
+        ]
+
+        try:
+            if self._backend == "chroma":
+                embeddings = await self._run_sync(self.embeddings.embed_documents, documents)
+                await self._run_sync(
+                    self._store.add,
+                    documents=documents,
+                    metadatas=metadatas,
+                    ids=ids,
+                    embeddings=embeddings,
+                )
+                self._stored_count = getattr(self, '_stored_count', 0) + len(chunks)
+                return len(chunks)
+
+            # PGVector / LangChain vectorstores
+            if hasattr(self._store, "add_documents"):
+                await self._run_sync(self._store.add_documents, documents, metadatas=metadatas, ids=ids)
+                return len(chunks)
+            if hasattr(self._store, "add_texts"):
+                await self._run_sync(self._store.add_texts, documents, metadatas=metadatas, ids=ids)
+                return len(chunks)
+        except Exception:
+            return 0
+
+        return 0
 
     async def search(self, query: str, top_k: int = 5) -> list[tuple[dict, float]]:
-        """Semantic search (chromadb is unstable in async contexts, so return empty results)"""
+        """Semantic search over the configured vector backend."""
         if not self.embeddings_available:
             return []
+
         if self._backend == "chroma":
-            return []  # Skip chromadb C-extension calls to avoid segfault
+            query_embedding = await self._run_sync(self.embeddings.embed_query, query)
+            result = await self._run_sync(
+                self._store.query,
+                query_embeddings=[query_embedding],
+                n_results=top_k,
+                include=["documents", "metadatas", "distances"],
+            )
+            documents = result.get("documents", [[]])[0]
+            metadatas = result.get("metadatas", [[]])[0]
+            distances = result.get("distances", [[]])[0]
+            return [
+                (
+                    {
+                        "content": doc,
+                        "source": metadata.get("source", ""),
+                        "metadata": metadata,
+                    },
+                    float(distance),
+                )
+                for doc, metadata, distance in zip(documents, metadatas, distances)
+            ]
+
         results = await self._store.asimilarity_search_with_score(query, k=top_k)
         return [
             ({"content": doc.page_content, "source": doc.metadata.get("source", ""), "metadata": doc.metadata}, score)
