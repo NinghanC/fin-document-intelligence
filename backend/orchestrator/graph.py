@@ -2,9 +2,9 @@
 LangGraph orchestration engine - hybrid orchestration for 4 agents
 
 Orchestration patterns:
-  1. Document ingestion flow: DocParser → KnowledgeExtract → (VectorStore + KnowledgeGraph)
-  2. QA flow: Query → QA Agent → (VectorRetrieval ∥ GraphRetrieval) → Answer
-  3. Incremental update flow: CDC Event → UpdateAgent → (Diff → Parse → Store)
+  1. Document ingestion flow: DocParser -> KnowledgeExtract -> (VectorStore + KnowledgeGraph)
+  2. QA flow: Query -> QA Agent -> (VectorRetrieval || GraphRetrieval) -> Answer
+  3. Incremental update flow: CDC Event -> UpdateAgent -> (Diff -> Parse -> Store)
 
 Uses LangGraph StateGraph for directed graph orchestration with conditional routing and parallel branches
 """
@@ -36,8 +36,7 @@ class WorkflowType(str, Enum):
     UPDATE = "update"
 
 
-# ── State Schemas ────────────────────────────────────────────
-
+# State Schemas
 class IngestState(dict):
     """Document Ingestionflow state"""
     file_paths: list[str]
@@ -62,8 +61,7 @@ class UpdateState(dict):
     messages: Annotated[list, add_messages]
 
 
-# ── Workflow Builder ─────────────────────────────────────────
-
+# Workflow Builder
 def build_knowledge_graph_workflow(
     vector_store: VectorStoreService | None = None,
     knowledge_graph: KnowledgeGraphService | None = None,
@@ -88,8 +86,7 @@ def build_knowledge_graph_workflow(
     }
 
 
-# ── Ingest Pipeline ─────────────────────────────────────────
-
+# Ingest Pipeline
 def _build_ingest_graph(
     doc_parser: DocParserAgent,
     extractor: KnowledgeExtractAgent,
@@ -125,10 +122,10 @@ def _build_ingest_graph(
             try:
                 for ext in extractions:
                     for ent in ext.entities:
-                        await knowledge_graph.upsert_entity(ent)
+                        await knowledge_graph.upsert_entity(ent, source=ext.source_chunk_id)
                         entity_count += 1
                     for rel in ext.relations:
-                        await knowledge_graph.add_relation(rel)
+                        await knowledge_graph.add_relation(rel, source=ext.source_chunk_id)
             except Exception:
                 pass
         return {**state, "entities_stored": entity_count}
@@ -148,8 +145,7 @@ def _build_ingest_graph(
     return graph.compile()
 
 
-# ── QA Pipeline ──────────────────────────────────────────────
-
+# QA Pipeline
 def _build_qa_graph(qa_agent: QAAgent) -> StateGraph:
 
     async def process_question(state: dict) -> dict:
@@ -165,8 +161,7 @@ def _build_qa_graph(qa_agent: QAAgent) -> StateGraph:
     return graph.compile()
 
 
-# ── Update Pipeline ──────────────────────────────────────────
-
+# Update Pipeline
 def _build_update_graph(update_agent: KnowledgeUpdateAgent) -> StateGraph:
 
     async def process_updates(state: dict) -> dict:

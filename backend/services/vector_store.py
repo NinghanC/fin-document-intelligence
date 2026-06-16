@@ -9,12 +9,16 @@ Responsibilities:
 
 from __future__ import annotations
 
+import hashlib
+import math
+import re
 from typing import Any
 
 from langchain_openai import OpenAIEmbeddings
 
 from agents.doc_parser_agent import DocumentChunk
 from config import settings
+from utils.model_clients import has_provider_key
 
 
 class _SubprocessEmbeddings:
@@ -47,11 +51,44 @@ class _SubprocessEmbeddings:
         return result[0]
 
 
+class _HashEmbeddings:
+    """Deterministic lightweight embeddings for offline demos and tests."""
+
+    def __init__(self, dimensions: int = 768) -> None:
+        self.dimensions = dimensions
+
+    def _embed(self, text: str) -> list[float]:
+        vector = [0.0] * self.dimensions
+        tokens = re.findall(r"[a-zA-Z0-9]+", text.lower())
+        for token in tokens:
+            digest = hashlib.sha256(token.encode("utf-8")).digest()
+            idx = int.from_bytes(digest[:4], "big") % self.dimensions
+            sign = 1.0 if digest[4] % 2 == 0 else -1.0
+            vector[idx] += sign
+        norm = math.sqrt(sum(v * v for v in vector)) or 1.0
+        return [v / norm for v in vector]
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [self._embed(text) for text in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._embed(text)
+
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_documents(texts)
+
+    async def aembed_query(self, text: str) -> list[float]:
+        return self.embed_query(text)
+
+
 def _create_embeddings():
-    """Create an embedding instance from configuration, using subprocess isolation to avoid segfaults"""
+    """Create an embedding instance from configuration, with an offline demo fallback."""
     import os
-    if os.environ.get("DISABLE_LOCAL_EMBEDDINGS") == "1":
-        return None
+    provider = settings.embedding_provider.lower()
+    if provider == "hash" or not has_provider_key():
+        return _HashEmbeddings()
+    if provider == "local" and os.environ.get("DISABLE_LOCAL_EMBEDDINGS") != "1":
+        return _SubprocessEmbeddings()
     return OpenAIEmbeddings(
         model=settings.embedding_model,
         api_key=settings.openai_api_key,
@@ -81,21 +118,17 @@ class VectorStoreService:
     def embeddings(self):
         if self._embeddings is None:
             import os
-            # Skip HuggingFace embedding model if it causes instability
-            # Use DISABLE_LOCAL_EMBEDDINGS=1 to force LLM-only mode
-            if os.environ.get("DISABLE_LOCAL_EMBEDDINGS") == "1":
-                return None
+            # DISABLE_LOCAL_EMBEDDINGS only skips subprocess/local model loading.
+            # Hash embeddings keep the public demo searchable without external keys.
             try:
                 self._embeddings = _create_embeddings()
             except Exception:
-                self._embeddings = None
+                self._embeddings = _HashEmbeddings()
         return self._embeddings
 
     @property
     def embeddings_available(self) -> bool:
         import os
-        if os.environ.get("DISABLE_LOCAL_EMBEDDINGS") == "1":
-            return False
         if self._embeddings is not None:
             return True
         # Try loading; if it fails, stay disabled
@@ -104,8 +137,7 @@ class VectorStoreService:
         except Exception:
             return False
 
-    # ── initialization ───────────────────────────────────────
-
+    # initialization
     async def init(self) -> None:
         if self._backend == "chroma":
             await self._init_chroma()
@@ -116,9 +148,17 @@ class VectorStoreService:
         def _init():
             import chromadb
             import os
-            persist_dir = os.path.join(settings.upload_dir, "..", "chroma_data")
-            os.makedirs(persist_dir, exist_ok=True)
-            client = chromadb.PersistentClient(path=persist_dir)
+
+            if settings.chroma_mode == "http":
+                client = chromadb.HttpClient(
+                    host=settings.chroma_host,
+                    port=settings.chroma_port,
+                )
+            else:
+                persist_dir = os.path.join(settings.upload_dir, "..", "chroma_data")
+                os.makedirs(persist_dir, exist_ok=True)
+                client = chromadb.PersistentClient(path=persist_dir)
+
             return client.get_or_create_collection(
                 name=self.COLLECTION_NAME,
                 metadata={"hnsw:space": "cosine"},
@@ -131,13 +171,14 @@ class VectorStoreService:
             connection_string=settings.pgvector_dsn,
             collection_name=self.COLLECTION_NAME,
             embedding_function=self.embeddings,
+            use_jsonb=True,
+            create_extension=True,
         )
 
-    # ── CRUD ─────────────────────────────────────────────────
-
+    # CRUD
     async def add_chunks(self, chunks: list[DocumentChunk]) -> int:
         """Vectorize and store document chunks."""
-        if not chunks or not self.embeddings_available:
+        if not chunks or self._store is None or not self.embeddings_available:
             return 0
 
         documents = [chunk.content for chunk in chunks]
@@ -165,12 +206,13 @@ class VectorStoreService:
                 self._stored_count = getattr(self, '_stored_count', 0) + len(chunks)
                 return len(chunks)
 
-            # PGVector / LangChain vectorstores
-            if hasattr(self._store, "add_documents"):
-                await self._run_sync(self._store.add_documents, documents, metadatas=metadatas, ids=ids)
-                return len(chunks)
-            if hasattr(self._store, "add_texts"):
-                await self._run_sync(self._store.add_texts, documents, metadatas=metadatas, ids=ids)
+            if self._backend == "pgvector":
+                await self._run_sync(
+                    self._store.add_texts,
+                    documents,
+                    metadatas=metadatas,
+                    ids=ids,
+                )
                 return len(chunks)
         except Exception:
             return 0
@@ -179,7 +221,7 @@ class VectorStoreService:
 
     async def search(self, query: str, top_k: int = 5) -> list[tuple[dict, float]]:
         """Semantic search over the configured vector backend."""
-        if not self.embeddings_available:
+        if self._store is None or not self.embeddings_available:
             return []
 
         if self._backend == "chroma":
@@ -200,12 +242,12 @@ class VectorStoreService:
                         "source": metadata.get("source", ""),
                         "metadata": metadata,
                     },
-                    float(distance),
+                    max(0.0, 1.0 - float(distance)),
                 )
                 for doc, metadata, distance in zip(documents, metadatas, distances)
             ]
 
-        results = await self._store.asimilarity_search_with_score(query, k=top_k)
+        results = await self._run_sync(self._store.similarity_search_with_score, query, k=top_k)
         return [
             ({"content": doc.page_content, "source": doc.metadata.get("source", ""), "metadata": doc.metadata}, score)
             for doc, score in results
@@ -213,12 +255,17 @@ class VectorStoreService:
 
     async def delete_by_doc_id(self, doc_id: str) -> int:
         """Delete all related vectors by doc_id"""
+        if self._store is None:
+            return 0
         if self._backend == "chroma":
             existing = await self._run_sync(self._store.get, where={"doc_id": doc_id}, include=[])
             ids = existing.get("ids", [])
             if ids:
                 await self._run_sync(self._store.delete, ids=ids)
+                self._stored_count = max(0, getattr(self, "_stored_count", 0) - len(ids))
             return len(ids)
+        if self._backend == "pgvector":
+            return await self._delete_pgvector_by_doc_id(doc_id)
         return 0
 
     async def get_stats(self) -> dict:
@@ -229,4 +276,66 @@ class VectorStoreService:
             # Avoid chromadb C-extension calls in async context (may segfault).
             # Count is maintained manually via _stored_count.
             return {"backend": "chroma", "total_vectors": getattr(self, '_stored_count', 0), "collection": self.COLLECTION_NAME}
-        return {"backend": "pgvector", "collection": self.COLLECTION_NAME}
+        return {
+            "backend": "pgvector",
+            "collection": self.COLLECTION_NAME,
+            "total_vectors": await self._count_pgvector_vectors(),
+        }
+
+    async def _delete_pgvector_by_doc_id(self, doc_id: str) -> int:
+        """Delete PGVector rows whose metadata belongs to the given document."""
+        def _delete() -> int:
+            from sqlalchemy import create_engine, text
+
+            engine = create_engine(settings.pgvector_dsn)
+            try:
+                with engine.begin() as conn:
+                    result = conn.execute(
+                        text(
+                            """
+                            DELETE FROM langchain_pg_embedding AS e
+                            USING langchain_pg_collection AS c
+                            WHERE e.collection_id = c.uuid
+                              AND c.name = :collection
+                              AND e.cmetadata ->> 'doc_id' = :doc_id
+                            """
+                        ),
+                        {"collection": self.COLLECTION_NAME, "doc_id": doc_id},
+                    )
+                    return result.rowcount or 0
+            finally:
+                engine.dispose()
+
+        try:
+            return await self._run_sync(_delete)
+        except Exception:
+            return 0
+
+    async def _count_pgvector_vectors(self) -> int:
+        """Count vectors stored in the configured PGVector collection."""
+        def _count() -> int:
+            from sqlalchemy import create_engine, text
+
+            engine = create_engine(settings.pgvector_dsn)
+            try:
+                with engine.begin() as conn:
+                    result = conn.execute(
+                        text(
+                            """
+                            SELECT COUNT(*) AS cnt
+                            FROM langchain_pg_embedding AS e
+                            JOIN langchain_pg_collection AS c
+                              ON e.collection_id = c.uuid
+                            WHERE c.name = :collection
+                            """
+                        ),
+                        {"collection": self.COLLECTION_NAME},
+                    )
+                    return int(result.scalar() or 0)
+            finally:
+                engine.dispose()
+
+        try:
+            return await self._run_sync(_count)
+        except Exception:
+            return 0

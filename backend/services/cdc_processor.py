@@ -11,7 +11,7 @@ Supports two CDC sources:
 
 Incremental update flow:
   Change event -> delta analysis -> incremental parsing -> incremental vectorization -> incremental graph update
-              ↓
+              v
           Version management (each knowledge node has a version and timestamp)
 """
 
@@ -66,8 +66,7 @@ class CDCProcessor:
         self._event_log: list[CDCEvent] = []
         self._processing_queue: list[CDCEvent] = []
 
-    # ── Event Normalization ──────────────────────────────────
-
+    # Event Normalization
     @staticmethod
     def from_filesystem_event(event_type: str, file_path: str, content_before: str = "", content_after: str = "") -> CDCEvent:
         """Create a CDCEvent from a file system event"""
@@ -95,8 +94,7 @@ class CDCProcessor:
             timestamp=payload.get("ts_ms", time.time() * 1000) / 1000,
         )
 
-    # ── Diff Computation ─────────────────────────────────────
-
+    # Diff Computation
     @staticmethod
     def compute_diff(before: str, after: str) -> dict[str, Any]:
         """
@@ -123,8 +121,7 @@ class CDCProcessor:
             "is_major_change": change_ratio > 0.3,
         }
 
-    # ── Version Management ───────────────────────────────────
-
+    # Version Management
     def bump_version(self, resource_path: str) -> int:
         """Increment the resource version number"""
         current = self._version_map.get(resource_path, 0)
@@ -135,8 +132,7 @@ class CDCProcessor:
     def get_version(self, resource_path: str) -> int:
         return self._version_map.get(resource_path, 0)
 
-    # ── Processing ───────────────────────────────────────────
-
+    # Processing
     async def process_event(self, event: CDCEvent) -> CDCProcessResult:
         """Process a single CDC event"""
         start = time.time()
@@ -179,8 +175,7 @@ class CDCProcessor:
             results.append(await self.process_event(event))
         return results
 
-    # ── Kafka Consumer ───────────────────────────────────────
-
+    # Kafka Consumer
     async def start_kafka_consumer(self, topics: list[str] | None = None) -> None:
         """Start the Kafka CDC consumer loop"""
         from confluent_kafka import Consumer
@@ -207,8 +202,7 @@ class CDCProcessor:
         finally:
             consumer.close()
 
-    # ── Stats & History ──────────────────────────────────────
-
+    # Stats & History
     def get_stats(self) -> dict[str, Any]:
         return {
             "total_events_processed": len(self._event_log),

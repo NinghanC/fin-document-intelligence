@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o"
     embedding_model: str = "text-embedding-3-small"
+    embedding_provider: str = "auto"  # auto | openai | local | hash
 
     # Neo4j
     neo4j_uri: str = "bolt://localhost:7687"
@@ -19,6 +20,7 @@ class Settings(BaseSettings):
 
     # Vector Store
     vector_store_type: str = "chroma"  # chroma | pgvector
+    chroma_mode: str = "local"  # local | http
     chroma_host: str = "localhost"
     chroma_port: int = 8000
     pgvector_dsn: str = "postgresql://postgres:postgres@localhost:5432/knowledge"
@@ -28,6 +30,7 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_topic_doc_changes: str = "doc-changes"
     kafka_topic_kg_updates: str = "kg-updates"
+    enable_cdc_consumer: bool = False
 
     # API
     api_host: str = "0.0.0.0"

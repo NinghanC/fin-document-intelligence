@@ -17,9 +17,7 @@ from enum import Enum
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
-
-from config import settings
+from utils.model_clients import create_chat_model
 
 
 class DocType(str, Enum):
@@ -51,7 +49,7 @@ class DocParserAgent:
     Document Parser Agent
 
     Workflow:
-      classify → parse → chunk → enrich_metadata → output
+      classify -> parse -> chunk -> enrich_metadata -> output
     """
 
     SUPPORTED_EXTENSIONS: dict[str, DocType] = {
@@ -70,15 +68,9 @@ class DocParserAgent:
     CHUNK_OVERLAP = 64
 
     def __init__(self) -> None:
-        self.llm = ChatOpenAI(
-            model=settings.openai_model,
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-            temperature=0,
-        )
+        self.llm = create_chat_model()
 
-    # ── public API ───────────────────────────────────────────
-
+    # public API
     async def parse(self, file_path: str) -> list[DocumentChunk]:
         """Parse one file and return a list of document chunks"""
         doc_type = self._classify(file_path)
@@ -106,18 +98,17 @@ class DocParserAgent:
             all_chunks.extend(await self.parse(fp))
         return all_chunks
 
-    # ── classification ───────────────────────────────────────
-
+    # classification
     def _classify(self, file_path: str) -> DocType:
         ext = os.path.splitext(file_path)[1].lower()
         return self.SUPPORTED_EXTENSIONS.get(ext, DocType.UNKNOWN)
 
     @staticmethod
     def _make_doc_id(file_path: str) -> str:
-        return hashlib.sha256(file_path.encode()).hexdigest()[:16]
+        canonical_path = os.path.abspath(file_path)
+        return hashlib.sha256(canonical_path.encode()).hexdigest()[:16]
 
-    # ── PDF parsing ──────────────────────────────────────────
-
+    # PDF parsing
     async def _parse_pdf(self, file_path: str) -> list[str]:
         """
         Multimodal PDF parsing:
@@ -155,8 +146,7 @@ class DocParserAgent:
         except Exception:
             return [f"[PDF vision parsing failed] {file_path}"]
 
-    # ── image parsing ────────────────────────────────────────
-
+    # image parsing
     async def _parse_image(self, file_path: str) -> list[str]:
         """Image parsing: OCR + LLM vision understanding"""
         texts: list[str] = []
@@ -198,8 +188,7 @@ class DocParserAgent:
         resp = await self.llm.ainvoke(messages)
         return resp.content
 
-    # ── table parsing ────────────────────────────────────────
-
+    # table parsing
     async def _parse_table(self, file_path: str) -> list[str]:
         """Table parsing: CSV / Excel -> structured text"""
         ext = os.path.splitext(file_path)[1].lower()
@@ -250,15 +239,13 @@ class DocParserAgent:
         except Exception:
             return [f"[Excel parsing failed] {file_path}"]
 
-    # ── text / markdown ──────────────────────────────────────
-
+    # text / markdown
     @staticmethod
     def _parse_text(file_path: str) -> list[str]:
         with open(file_path, encoding="utf-8") as f:
             return [f.read()]
 
-    # ── chunking ─────────────────────────────────────────────
-
+    # chunking
     def _chunk_texts(
         self,
         texts: list[str],

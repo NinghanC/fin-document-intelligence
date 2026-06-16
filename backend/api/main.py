@@ -2,16 +2,18 @@
 FastAPI entry point - enterprise knowledge management REST API
 
 Provides three endpoint groups:
-  1. /api/ingest   — document upload and ingestion
-  2. /api/qa       — intelligent QA
-  3. /api/admin    — administration (statistics and update triggers)
+  1. /api/ingest   - document upload and ingestion
+  2. /api/qa       - intelligent QA
+  3. /api/admin    - administration (statistics and update triggers)
 """
 
 from __future__ import annotations
 
 import os
 import shutil
+import asyncio
 from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -24,29 +26,43 @@ from agents.knowledge_update_agent import ChangeType, DocumentChange, KnowledgeU
 from agents.qa_agent import QAAgent
 from config import settings
 from orchestrator.graph import build_knowledge_graph_workflow
+from services.cdc_processor import CDCEvent, CDCProcessor
 from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import VectorStoreService
 
 vector_store = VectorStoreService()
 knowledge_graph = KnowledgeGraphService()
+cdc_processor = CDCProcessor()
 workflows: dict[str, Any] = {}
+background_tasks: list[asyncio.Task] = []
+
+
+async def _init_with_retry(name: str, init_fn: Callable[[], Awaitable[None]], attempts: int = 10, delay: float = 2.0) -> bool:
+    """Initialize a service that may start slightly after the API container."""
+    for attempt in range(1, attempts + 1):
+        try:
+            await init_fn()
+            return True
+        except Exception:
+            if attempt == attempts:
+                return False
+            await asyncio.sleep(delay)
+    return False
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(settings.upload_dir, exist_ok=True)
-    try:
-        await vector_store.init()
-    except Exception:
-        pass
-    try:
-        await knowledge_graph.init()
-    except Exception:
-        pass
+    await _init_with_retry("vector_store", vector_store.init)
+    await _init_with_retry("knowledge_graph", knowledge_graph.init)
     workflows.update(
         build_knowledge_graph_workflow(vector_store=vector_store, knowledge_graph=knowledge_graph)
     )
+    if settings.enable_cdc_consumer:
+        background_tasks.append(asyncio.create_task(cdc_processor.start_kafka_consumer()))
     yield
+    for task in background_tasks:
+        task.cancel()
     await knowledge_graph.close()
 
 
@@ -57,8 +73,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── Static Files & Frontend ──────────────────────────────────
-
+# Static Files & Frontend
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
 os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -70,8 +85,7 @@ async def serve_frontend():
     return FileResponse(os.path.join(static_dir, "index.html"))
 
 
-# ── Request / Response Models ────────────────────────────────
-
+# Request / Response Models
 class QuestionRequest(BaseModel):
     question: str
 
@@ -96,6 +110,7 @@ class IngestResponse(BaseModel):
 class StatsResponse(BaseModel):
     vector_store: dict[str, Any]
     knowledge_graph: dict[str, Any]
+    cdc: dict[str, Any] = {}
 
 
 class UpdateRequest(BaseModel):
@@ -113,8 +128,14 @@ class UpdateResponse(BaseModel):
     processing_time_ms: float
 
 
-# ── Ingest Endpoints ─────────────────────────────────────────
+class CDCEventRequest(BaseModel):
+    operation: str = "UPDATE"
+    resource_path: str
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
 
+
+# Ingest Endpoints
 @app.post("/api/ingest/upload", response_model=IngestResponse, tags=["Document Ingestion"])
 async def upload_document(file: UploadFile = File(...)):
     """Upload and parse a document, then automatically ingest it into the vector store and knowledge graph"""
@@ -151,8 +172,7 @@ async def upload_batch(files: list[UploadFile] = File(...)):
     return results
 
 
-# ── QA Endpoints ─────────────────────────────────────────────
-
+# QA Endpoints
 @app.post("/api/qa/ask", response_model=QuestionResponse, tags=["intelligent QA"])
 async def ask_question(req: QuestionRequest):
     """Intelligent QA - hybrid retrieval + knowledge graph reasoning"""
@@ -178,8 +198,7 @@ async def ask_question(req: QuestionRequest):
     )
 
 
-# ── Admin Endpoints ──────────────────────────────────────────
-
+# Admin Endpoints
 @app.get("/api/admin/stats", response_model=StatsResponse, tags=["System Administration"])
 async def get_stats():
     """Get system statistics"""
@@ -191,7 +210,7 @@ async def get_stats():
         kg_stats = await knowledge_graph.get_stats()
     except Exception:
         kg_stats = {"total_entities": 0, "total_relations": 0}
-    return StatsResponse(vector_store=vs_stats, knowledge_graph=kg_stats)
+    return StatsResponse(vector_store=vs_stats, knowledge_graph=kg_stats, cdc=cdc_processor.get_stats())
 
 
 @app.post("/api/admin/update", response_model=UpdateResponse, tags=["System Administration"])
@@ -222,9 +241,33 @@ async def trigger_update(req: UpdateRequest):
     )
 
 
+@app.post("/api/admin/cdc/events", tags=["System Administration"])
+async def process_cdc_event(req: CDCEventRequest):
+    """Process a normalized CDC event through the incremental CDC processor."""
+    event = CDCEvent(
+        event_id=f"api-{req.resource_path}-{req.operation}",
+        source_type="api",
+        operation=req.operation.upper(),
+        resource_path=req.resource_path,
+        before=req.before,
+        after=req.after,
+    )
+    result = await cdc_processor.process_event(event)
+    return {
+        "success": result.success,
+        "event_id": result.event.event_id,
+        "version": result.version,
+        "chunks_affected": result.chunks_affected,
+        "entities_affected": result.entities_affected,
+        "processing_time_ms": result.processing_time_ms,
+        "diff": result.event.diff,
+        "error": result.error,
+    }
+
+
 @app.get("/api/health", tags=["System Administration"])
 async def health():
-    return {"status": "ok", "service": "finsight-assistant"}
+    return {"status": "ok", "name": "FinSight Assistant"}
 
 
 if __name__ == "__main__":

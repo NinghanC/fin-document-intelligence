@@ -57,7 +57,7 @@ class KnowledgeUpdateAgent:
       2. CDC mode (Kafka): consumes change events from the message queue
 
     Workflow:
-      detect_change → diff_analysis → incremental_parse → update_vector_store → update_knowledge_graph → log
+      detect_change -> diff_analysis -> incremental_parse -> update_vector_store -> update_knowledge_graph -> log
     """
 
     def __init__(
@@ -74,8 +74,7 @@ class KnowledgeUpdateAgent:
         self._file_hashes: dict[str, str] = {}
         self._version_counter: dict[str, int] = {}
 
-    # ── public API ───────────────────────────────────────────
-
+    # public API
     async def process_change(self, change: DocumentChange) -> UpdateResult:
         """Process a single document change"""
         start = time.time()
@@ -136,8 +135,7 @@ class KnowledgeUpdateAgent:
 
         return changes
 
-    # ── watchdog mode ────────────────────────────────────────
-
+    # watchdog mode
     def start_watching(self, directory: str) -> None:
         """Start file system watching (non-blocking, runs in a separate thread)"""
         import threading
@@ -180,8 +178,7 @@ class KnowledgeUpdateAgent:
         t = threading.Thread(target=_run, daemon=True)
         t.start()
 
-    # ── kafka CDC mode ───────────────────────────────────────
-
+    # kafka CDC mode
     async def start_kafka_consumer(self) -> None:
         """Start the Kafka CDC consumer"""
         import json
@@ -213,8 +210,7 @@ class KnowledgeUpdateAgent:
         finally:
             consumer.close()
 
-    # ── internal handlers ────────────────────────────────────
-
+    # internal handlers
     async def _handle_create(self, change: DocumentChange, result: UpdateResult) -> None:
         if not self.doc_parser:
             return
@@ -229,14 +225,14 @@ class KnowledgeUpdateAgent:
             for ext in extractions:
                 for ent in ext.entities:
                     version = self._bump_version(ent.name)
-                    await self.knowledge_graph.upsert_entity(ent, version=version)
+                    await self.knowledge_graph.upsert_entity(ent, version=version, source=ext.source_chunk_id)
                     result.entities_added += 1
                 for rel in ext.relations:
-                    await self.knowledge_graph.add_relation(rel)
+                    await self.knowledge_graph.add_relation(rel, source=ext.source_chunk_id)
                     result.relations_added += 1
 
     async def _handle_modify(self, change: DocumentChange, result: UpdateResult) -> None:
-        doc_id = hashlib.sha256(change.file_path.encode()).hexdigest()[:16]
+        doc_id = hashlib.sha256(self._canonical_path(change.file_path).encode()).hexdigest()[:16]
 
         if self.vector_store:
             deleted = await self.vector_store.delete_by_doc_id(doc_id)
@@ -245,7 +241,7 @@ class KnowledgeUpdateAgent:
         await self._handle_create(change, result)
 
     async def _handle_delete(self, change: DocumentChange, result: UpdateResult) -> None:
-        doc_id = hashlib.sha256(change.file_path.encode()).hexdigest()[:16]
+        doc_id = hashlib.sha256(self._canonical_path(change.file_path).encode()).hexdigest()[:16]
 
         if self.vector_store:
             deleted = await self.vector_store.delete_by_doc_id(doc_id)
@@ -254,8 +250,7 @@ class KnowledgeUpdateAgent:
         if self.knowledge_graph:
             await self.knowledge_graph.delete_by_source(change.file_path)
 
-    # ── utilities ────────────────────────────────────────────
-
+    # utilities
     @staticmethod
     def _compute_hash(file_path: str) -> str:
         try:
@@ -263,6 +258,11 @@ class KnowledgeUpdateAgent:
                 return hashlib.sha256(f.read()).hexdigest()
         except FileNotFoundError:
             return ""
+
+    @staticmethod
+    def _canonical_path(file_path: str) -> str:
+        import os
+        return os.path.abspath(file_path)
 
     def _bump_version(self, entity_name: str) -> int:
         ver = self._version_counter.get(entity_name, 0) + 1

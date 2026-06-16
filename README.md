@@ -22,7 +22,7 @@ The following production-specific components have been removed, simplified, or r
 - provider-specific model routing, fallback policies, and cost-control configuration
 - benchmark results, business metrics, and internal performance traces
 
-Because of this sanitization, a few implementation details in the public code are intentionally lighter than the architecture described here. For example, the public vector-store layer keeps the ChromaDB path defensive, the `GraphRAGPipeline` is present as a service-level component but is not fully wired into the main QA endpoint, and some source lineage fields are reduced compared with the internal implementation.
+Because of this sanitization, a few implementation details in the public code are intentionally lighter than the architecture described here. For example, the public version uses local/demo-safe fallbacks for model calls and graph storage when managed providers are not configured, while production retrieval tuning, source-policy mapping, and regulated workflow hooks are reduced compared with the internal implementation.
 
 ## What Problem It Solves
 
@@ -115,8 +115,9 @@ Docker Compose starts the local infrastructure:
 | --- | --- | --- |
 | FastAPI backend | API and static UI | `8080` |
 | Neo4j | Knowledge graph | `7474`, `7687` |
-| ChromaDB | Local vector database service; the current backend uses a defensive local persistent-client path unless PGVector is selected | `8000` |
-| Kafka | CDC-style event queue | `9092` |
+| ChromaDB | Local vector database service; the backend supports embedded persistent-client mode and Docker HTTP mode | `8000` |
+| PGVector | PostgreSQL vector retrieval backend for production-oriented semantic search | `5432` |
+| Kafka | CDC-style event queue | `29092` on the host, `9092` inside Docker |
 | Zookeeper | Kafka dependency | internal |
 
 ## Repository Layout
@@ -331,14 +332,14 @@ The system maintains two storage paths:
 | Vector store | Semantic similarity search over document chunks |
 | Neo4j graph | Entity relationships and multi-hop reasoning |
 
-The current vector-store implementation is intentionally defensive:
+The current vector-store implementation is intentionally defensive but functional for a local prototype:
 
-- ChromaDB operations are isolated through a thread pool.
-- ChromaDB search returns an empty result in async mode to avoid unstable C-extension behavior.
-- `add_chunks()` currently tracks counts rather than making full ChromaDB writes.
-- PGVector is the intended production-oriented retrieval path once full vector writes are enabled.
+- ChromaDB operations run through a thread pool around either a local persistent client or a Docker-hosted HTTP client.
+- `add_chunks()` writes documents, metadata, IDs, and embeddings to the configured vector backend.
+- ChromaDB search embeds the query and reads back matching documents, metadata, and distances.
+- PGVector remains the more direct path for real vector retrieval: Docker Compose starts a pgvector-enabled PostgreSQL service, `add_chunks()` writes texts and metadata through LangChain PGVector, and `search()` reads results through `similarity_search_with_score()`.
 
-This means the architecture is in place, but production-grade vector persistence and retrieval still need hardening.
+This means the architecture is in place, while production-grade vector operations still need hardening around indexing policy, failure handling, and observability.
 
 ### 5. Question Answering
 
@@ -453,10 +454,14 @@ Important variables:
 | `OPENAI_BASE_URL` | OpenAI-compatible provider endpoint |
 | `OPENAI_MODEL` | Chat model or deployment name |
 | `EMBEDDING_MODEL` | Embedding model name |
+| `EMBEDDING_PROVIDER` | `auto`, `openai`, `local`, or `hash`; `auto` uses provider embeddings when configured and demo-safe hash embeddings otherwise |
 | `NEO4J_URI` | Neo4j Bolt URI |
 | `NEO4J_USER` | Neo4j username |
 | `NEO4J_PASSWORD` | Neo4j password |
 | `VECTOR_STORE_TYPE` | `chroma` or `pgvector` |
+| `CHROMA_MODE` | `local` for embedded persistence or `http` for Docker-hosted ChromaDB |
+| `CHROMA_HOST` | ChromaDB host when `CHROMA_MODE=http` |
+| `CHROMA_PORT` | ChromaDB port when `CHROMA_MODE=http` |
 | `PGVECTOR_DSN` | PGVector connection string |
 | `KAFKA_BOOTSTRAP_SERVERS` | Kafka bootstrap server |
 | `UPLOAD_DIR` | File upload directory |
@@ -488,7 +493,9 @@ When running with Docker Compose, use service hostnames:
 
 ```env
 NEO4J_URI=bolt://neo4j:7687
+CHROMA_MODE=http
 CHROMA_HOST=chromadb
+PGVECTOR_DSN=postgresql://postgres:postgres@pgvector:5432/knowledge
 KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 API_PORT=8080
 ```
@@ -525,6 +532,12 @@ neo4j / local-password
 
 These credentials are local demo defaults only.
 
+The bundled PGVector service also uses local demo defaults:
+
+```text
+postgres / postgres
+```
+
 ## Local Development
 
 You can also run the backend directly after installing dependencies:
@@ -535,10 +548,16 @@ pip install -r requirements.txt
 uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
+The subprocess `EmbeddingWorker` is optional. Install it only when you want `EMBEDDING_PROVIDER=local`:
+
+```bash
+pip install -r requirements-local-embeddings.txt
+```
+
 For local infrastructure only:
 
 ```bash
-docker compose up -d neo4j chromadb zookeeper kafka
+docker compose up -d neo4j chromadb pgvector zookeeper kafka
 ```
 
 ## Implementation Status
@@ -553,12 +572,13 @@ Implemented:
 - LLM-based entity, relation, and event extraction.
 - Neo4j entity and relation writing.
 - ChromaDB/PGVector vector-store abstraction.
+- PGVector write and similarity-search path for production-oriented retrieval.
 - CDC and file-change update scaffolding.
 - Docker Compose local stack.
 
 Partially implemented:
 
-- Production-grade vector persistence and retrieval.
+- Production-grade vector indexing, retrieval tuning, and observability.
 - GraphRAG integration into the main QA path.
 - Fine-grained incremental updates.
 - OCR and vision robustness for scanned financial PDFs.
@@ -573,7 +593,7 @@ Known gaps:
 - No full observability stack.
 - No formal audit log for regulated workflows.
 - Minimal automated tests.
-- ChromaDB async behavior is intentionally limited.
+- ChromaDB calls are isolated through sync wrappers for local runtime stability.
 
 ## Production Hardening Roadmap
 

@@ -22,11 +22,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
-
-from config import settings
 from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import VectorStoreService
+from utils.model_clients import create_chat_model
 
 
 @dataclass
@@ -69,12 +67,7 @@ class GraphRAGPipeline:
     ) -> None:
         self.vector_store = vector_store
         self.knowledge_graph = knowledge_graph
-        self.llm = ChatOpenAI(
-            model=settings.openai_model,
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-            temperature=0,
-        )
+        self.llm = create_chat_model()
 
     async def retrieve(self, query: str, top_k: int = 10) -> list[GraphRAGContext]:
         """
@@ -95,8 +88,7 @@ class GraphRAGPipeline:
         reranked = self._cross_rerank(all_results, query)
         return reranked[:top_k]
 
-    # ── Step 1: Vector retrieval ─────────────────────────────────────
-
+    # Step 1: Vector retrieval
     async def _vector_search(self, query: str, top_k: int = 5) -> list[GraphRAGContext]:
         results = await self.vector_store.search(query, top_k=top_k)
         return [
@@ -109,8 +101,7 @@ class GraphRAGPipeline:
             for doc, score in results
         ]
 
-    # ── Step 2: Entity linking ─────────────────────────────────────
-
+    # Step 2: Entity linking
     async def _entity_linking(self, query: str) -> list[str]:
         messages = [
             SystemMessage(content=ENTITY_LINKING_PROMPT),
@@ -126,8 +117,7 @@ class GraphRAGPipeline:
         except (json.JSONDecodeError, IndexError):
             return []
 
-    # ── Step 3: Subgraph retrieval ─────────────────────────────────────
-
+    # Step 3: Subgraph retrieval
     async def _subgraph_search(self, entities: list[str], hops: int = 2) -> list[GraphRAGContext]:
         contexts: list[GraphRAGContext] = []
         for entity_name in entities:
@@ -148,8 +138,7 @@ class GraphRAGPipeline:
                 ))
         return contexts
 
-    # ── Step 4: Path retrieval ─────────────────────────────────────
-
+    # Step 4: Path retrieval
     async def _path_search(self, entities: list[str]) -> list[GraphRAGContext]:
         """Find shortest paths between entity pairs and provide reasoning chains"""
         if len(entities) < 2:
@@ -189,8 +178,7 @@ class GraphRAGPipeline:
                     continue
         return contexts
 
-    # ── Step 5: Community summary ─────────────────────────────────────
-
+    # Step 5: Community summary
     async def _community_summary(self, subgraph_results: list[GraphRAGContext]) -> GraphRAGContext:
         """Summarize retrieved subgraph information"""
         subgraph_text = "\n".join(r.content for r in subgraph_results[:20])
@@ -206,16 +194,15 @@ class GraphRAGPipeline:
             metadata={"type": "community_summary"},
         )
 
-    # ── Step 6: cross-rerank ───────────────────────────────────
-
+    # Step 6: cross-rerank
     @staticmethod
     def _cross_rerank(contexts: list[GraphRAGContext], query: str) -> list[GraphRAGContext]:
         """
         Cross-reranking strategy:
-          - Vector retrieval: base score × 1.0
-          - Subgraph retrieval: base score × 1.15 (structured information is more precise)
-          - Path retrieval: base score × 1.25 (reasoning chains are most valuable)
-          - Community summary: base score × 1.1  (high-level overview)
+          - Vector retrieval: base score x 1.0
+          - Subgraph retrieval: base score x 1.15 (structured information is more precise)
+          - Path retrieval: base score x 1.25 (reasoning chains are most valuable)
+          - Community summary: base score x 1.1 (high-level overview)
         """
         weight_map = {"vector": 1.0, "subgraph": 1.15, "path": 1.25, "community": 1.1}
         for ctx in contexts:

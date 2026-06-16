@@ -1,4 +1,4 @@
-# ── Python ────────────────────────
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -15,7 +15,7 @@ env/
 
 
 
-# ── IDE ───────────────────────────
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -24,25 +24,28 @@ env/
 .DS_Store
 Thumbs.db
 
-# ── Docker ────────────────────────
+# Docker
 docker-compose.override.yml
 
-# ── Data & Uploads ────────────────
+# Data and Uploads
 uploads/
 backend/uploads/
 backend/chroma_data/
 .uv-cache/
 .uv-python/
 .docker-tmp/
+.demo_tmp/
+.docker_demo_samples/
+.pytest_cache/
 *.sqlite
 *.db
 data/
 
-# ── Logs ──────────────────────────
+# Logs
 *.log
 logs/
 
-# ── Secrets ───────────────────────
+# Secrets
 *.pem
 *.key
 credentials.json

@@ -16,9 +16,8 @@ from enum import Enum
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
-
-from config import settings
+from services.graph_rag import GraphRAGPipeline
+from utils.model_clients import create_chat_model
 
 
 class QueryIntent(str, Enum):
@@ -94,7 +93,7 @@ class QAAgent:
     QA Agent
 
     Workflow:
-      query → intent_classify → rewrite → parallel_retrieve → rerank → generate_answer
+      query -> intent_classify -> rewrite -> parallel_retrieve -> rerank -> generate_answer
     """
 
     def __init__(
@@ -102,27 +101,23 @@ class QAAgent:
         vector_store: Any = None,
         knowledge_graph: Any = None,
     ) -> None:
-        self.llm = ChatOpenAI(
-            model=settings.openai_model,
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-            temperature=0,
-        )
+        self.llm = create_chat_model()
         self.vector_store = vector_store
         self.knowledge_graph = knowledge_graph
+        self.graph_rag = (
+            GraphRAGPipeline(vector_store, knowledge_graph)
+            if vector_store is not None and knowledge_graph is not None
+            else None
+        )
 
-    # ── public API ───────────────────────────────────────────
-
+    # public API
     async def answer(self, question: str) -> QAResult:
         """Complete QA flow"""
         intent = await self._classify_intent(question)
         rewritten = await self._rewrite_query(question)
 
-        vector_contexts = await self._vector_retrieve(rewritten)
-        graph_contexts = await self._graph_retrieve(question, rewritten)
-
-        all_contexts = self._hybrid_rerank(vector_contexts + graph_contexts)
-        top_contexts = all_contexts[:8]
+        all_contexts = await self._retrieve_contexts(question, rewritten)
+        top_contexts = self._balanced_top_contexts(all_contexts, limit=8)
 
         answer_text, reasoning = await self._generate_answer(question, top_contexts, intent)
 
@@ -135,8 +130,47 @@ class QAAgent:
             reasoning_steps=reasoning,
         )
 
-    # ── intent classification ────────────────────────────────
+    async def _retrieve_contexts(self, question: str, rewritten: dict) -> list[RetrievedContext]:
+        """Use the GraphRAG service when available, with the original hybrid path as fallback."""
+        if self.graph_rag is not None:
+            try:
+                graph_rag_contexts = await self.graph_rag.retrieve(question, top_k=20)
+                return [
+                    RetrievedContext(
+                        content=ctx.content,
+                        source=ctx.metadata.get("source", ctx.source_type),
+                        score=ctx.score,
+                        retrieval_type="vector" if ctx.source_type == "vector" else "graph",
+                        metadata={"source_type": ctx.source_type, **ctx.metadata},
+                    )
+                    for ctx in graph_rag_contexts
+                ]
+            except Exception:
+                pass
 
+        vector_contexts = await self._vector_retrieve(rewritten)
+        graph_contexts = await self._graph_retrieve(question, rewritten)
+        return self._hybrid_rerank(vector_contexts + graph_contexts)
+
+    @staticmethod
+    def _balanced_top_contexts(contexts: list[RetrievedContext], limit: int = 8) -> list[RetrievedContext]:
+        """Keep the highest-ranking contexts while preserving hybrid source diversity."""
+        selected: list[RetrievedContext] = []
+        for retrieval_type in ("vector", "graph"):
+            first = next((ctx for ctx in contexts if ctx.retrieval_type == retrieval_type), None)
+            if first is not None and first not in selected:
+                selected.append(first)
+
+        for ctx in contexts:
+            if len(selected) >= limit:
+                break
+            if ctx not in selected:
+                selected.append(ctx)
+
+        selected.sort(key=lambda ctx: ctx.score, reverse=True)
+        return selected[:limit]
+
+    # intent classification
     async def _classify_intent(self, question: str) -> QueryIntent:
         messages = [
             SystemMessage(content=INTENT_PROMPT),
@@ -149,8 +183,7 @@ class QAAgent:
                 return intent
         return QueryIntent.FACTOID
 
-    # ── query rewriting ──────────────────────────────────────
-
+    # query rewriting
     async def _rewrite_query(self, question: str) -> dict:
         import json
         messages = [
@@ -166,8 +199,7 @@ class QAAgent:
         except (json.JSONDecodeError, IndexError):
             return {"queries": [question], "entities": [], "keywords": []}
 
-    # ── vector retrieval ─────────────────────────────────────
-
+    # vector retrieval
     async def _vector_retrieve(self, rewritten: dict) -> list[RetrievedContext]:
         if not self.vector_store:
             return []
@@ -185,8 +217,7 @@ class QAAgent:
                 ))
         return contexts
 
-    # ── graph retrieval ──────────────────────────────────────
-
+    # graph retrieval
     async def _graph_retrieve(self, question: str, rewritten: dict) -> list[RetrievedContext]:
         if not self.knowledge_graph:
             return []
@@ -222,8 +253,7 @@ class QAAgent:
                 continue
         return contexts
 
-    # ── hybrid reranking ─────────────────────────────────────
-
+    # hybrid reranking
     @staticmethod
     def _hybrid_rerank(contexts: list[RetrievedContext]) -> list[RetrievedContext]:
         """
@@ -245,8 +275,7 @@ class QAAgent:
         unique.sort(key=lambda c: c.score, reverse=True)
         return unique
 
-    # ── answer generation ────────────────────────────────────
-
+    # answer generation
     async def _generate_answer(
         self,
         question: str,

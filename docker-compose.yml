@@ -26,6 +26,18 @@ services:
     environment:
       ANONYMIZED_TELEMETRY: "false"
 
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: finsight-pgvector
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: knowledge
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.0
     container_name: finsight-zookeeper
@@ -36,12 +48,14 @@ services:
     image: confluentinc/cp-kafka:7.7.0
     container_name: finsight-kafka
     ports:
-      - "9092:9092"
+      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
       - zookeeper
@@ -55,9 +69,12 @@ services:
       - "8080:8080"
     env_file:
       - ./backend/.env
+    environment:
+      ANONYMIZED_TELEMETRY: "false"
     depends_on:
       - neo4j
       - chromadb
+      - pgvector
       - kafka
     volumes:
       - ./backend:/app
@@ -66,4 +83,5 @@ services:
 volumes:
   neo4j_data:
   chroma_data:
+  pgvector_data:
   uploads:

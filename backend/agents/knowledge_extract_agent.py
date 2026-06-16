@@ -15,16 +15,14 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
-
 from agents.doc_parser_agent import DocumentChunk
-from config import settings
+from utils.model_clients import create_chat_model
 
 EXTRACTION_SYSTEM_PROMPT = """\
 You are a professional knowledge extraction engine. Given a text passage, extract:
-1. **entities**：people, organizations, locations, products, technologies, concepts, and similar items
-2. **relations**：relationships between entities, represented as triples (head entity, relation, tail entity)
-3. **events**：events mentioned in the text, including triggers and participants
+1. **entities**:people, organizations, locations, products, technologies, concepts, and similar items
+2. **relations**:relationships between entities, represented as triples (head entity, relation, tail entity)
+3. **events**:events mentioned in the text, including triggers and participants
 
 Return strictly in the following JSON format:
 {
@@ -88,21 +86,15 @@ class KnowledgeExtractAgent:
     Knowledge Extraction Agent
 
     Workflow:
-      receive_chunks → extract_per_chunk → deduplicate → resolve_entities → output_triples
+      receive_chunks -> extract_per_chunk -> deduplicate -> resolve_entities -> output_triples
     """
 
     BATCH_SIZE = 5
 
     def __init__(self) -> None:
-        self.llm = ChatOpenAI(
-            model=settings.openai_model,
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
-            temperature=0,
-        )
+        self.llm = create_chat_model()
 
-    # ── public API ───────────────────────────────────────────
-
+    # public API
     async def extract(self, chunks: list[DocumentChunk]) -> list[ExtractionResult]:
         """Extract knowledge from a group of document chunks"""
         results: list[ExtractionResult] = []
@@ -118,15 +110,14 @@ class KnowledgeExtractAgent:
         """Extract knowledge from a single text passage"""
         return await self._extract_from_text(text, chunk_id)
 
-    # ── core extraction ──────────────────────────────────────
-
+    # core extraction
     async def _extract_from_chunk(self, chunk: DocumentChunk) -> ExtractionResult:
         return await self._extract_from_text(chunk.content, chunk.chunk_id)
 
     async def _extract_from_text(self, text: str, source_id: str) -> ExtractionResult:
         messages = [
             SystemMessage(content=EXTRACTION_SYSTEM_PROMPT),
-            HumanMessage(content=f"Extract knowledge from the following text：\n\n{text}"),
+            HumanMessage(content=f"Extract knowledge from the following text:\n\n{text}"),
         ]
         resp = await self.llm.ainvoke(messages)
         return self._parse_response(resp.content, source_id)
@@ -175,8 +166,7 @@ class KnowledgeExtractAgent:
             source_chunk_id=source_id,
         )
 
-    # ── deduplication & entity resolution ────────────────────
-
+    # deduplication & entity resolution
     @staticmethod
     def _deduplicate(results: list[ExtractionResult]) -> list[ExtractionResult]:
         """
