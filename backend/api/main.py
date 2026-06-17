@@ -78,6 +78,14 @@ async def lifespan(app: FastAPI):
     workflows.update(
         build_knowledge_graph_workflow(vector_store=vector_store, knowledge_graph=knowledge_graph)
     )
+    update_wf = workflows.get("update")
+    if update_wf:
+        async def _process_cdc_change(change: DocumentChange) -> Any:
+            result = await update_wf.ainvoke({"changes": [change]})
+            results = result.get("results", [])
+            return results[0] if results else None
+
+        cdc_processor.set_update_handler(_process_cdc_change)
     if settings.enable_cdc_consumer:
         background_tasks.append(asyncio.create_task(cdc_processor.start_kafka_consumer()))
     yield
@@ -412,6 +420,7 @@ async def process_cdc_event(req: CDCEventRequest):
         "entities_affected": result.entities_affected,
         "processing_time_ms": result.processing_time_ms,
         "diff": result.event.diff,
+        "update_result": result.update_result,
         "error": result.error,
     }
 

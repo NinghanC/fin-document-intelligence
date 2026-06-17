@@ -1,12 +1,17 @@
+import asyncio
+import time
+
 import pytest
 
-from agents.doc_parser_agent import DocType, DocumentChunk
-from agents.knowledge_extract_agent import Entity, Relation
+from agents.doc_parser_agent import DocParserAgent, DocType, DocumentChunk
+from agents.knowledge_extract_agent import Entity, ExtractionResult, KnowledgeExtractAgent, Relation
 from agents.knowledge_update_agent import ChangeType, DocumentChange, KnowledgeUpdateAgent
-from agents.qa_agent import QAAgent, RetrievedContext
+from agents.qa_agent import QAAgent, QueryIntent, RetrievedContext
 from services.cdc_processor import CDCProcessor
+from services.embedding_worker import _worker_process
 from services.graph_rag import GraphRAGContext, GraphRAGPipeline
 from services.knowledge_graph import KnowledgeGraphService
+from services.vector_store import _SubprocessEmbeddings
 
 
 def test_multimodal_weights_keep_unknown_doc_type_neutral():
@@ -181,3 +186,215 @@ def test_graphrag_custom_weights_are_explicit_configuration():
     reranked = pipeline._cross_rerank(contexts, "fund risk")
 
     assert reranked[0].source_type == "subgraph"
+
+
+def test_graphrag_subgraph_scores_depend_on_query_relevance():
+    strong = GraphRAGPipeline._subgraph_score(
+        query="Global Income Fund duration risk",
+        query_entities=["Global Income Fund"],
+        entity="Global Income Fund",
+        record={"relations": ["RELATED_TO"], "target": "duration risk", "target_desc": "duration risk"},
+        content="Global Income Fund --[RELATED_TO]--> duration risk",
+    )
+    weak = GraphRAGPipeline._subgraph_score(
+        query="redemption policy",
+        query_entities=["Global Income Fund"],
+        entity="Global Income Fund",
+        record={"relations": [], "target": "duration risk", "target_desc": ""},
+        content="Global Income Fund --[]--> duration risk",
+    )
+
+    assert strong > weak
+
+
+def test_graphrag_path_scores_penalize_longer_paths():
+    short = GraphRAGPipeline._path_score("A", "B", ["A", "B"], ["RELATED_TO"])
+    long = GraphRAGPipeline._path_score("A", "B", ["A", "X", "Y", "B"], ["R1", "R2", "R3"])
+
+    assert short > long
+
+
+def test_qa_graph_record_score_depends_on_overlap():
+    strong = QAAgent._graph_record_score(
+        "duration risk liquidity",
+        {"node_names": ["Global Income Fund", "duration risk"], "relations": ["liquidity"]},
+    )
+    weak = QAAgent._graph_record_score("duration risk liquidity", {"name": "unrelated operating memo"})
+
+    assert strong > weak
+
+
+@pytest.mark.asyncio
+async def test_doc_parser_parse_batch_runs_concurrently():
+    class Parser(DocParserAgent):
+        async def parse(self, file_path):
+            await asyncio.sleep(0.05)
+            return [DocumentChunk(file_path, file_path, 0, DocType.TEXT, {})]
+
+    start = time.perf_counter()
+    chunks = await Parser().parse_batch(["a.txt", "b.txt", "c.txt"])
+    elapsed = time.perf_counter() - start
+
+    assert len(chunks) == 3
+    assert elapsed < 0.12
+
+
+@pytest.mark.asyncio
+async def test_knowledge_extract_batches_run_concurrently():
+    class Extractor(KnowledgeExtractAgent):
+        async def _extract_from_chunk(self, chunk):
+            await asyncio.sleep(0.05)
+            return ExtractionResult([], [], [], chunk.chunk_id)
+
+    chunks = [DocumentChunk(f"chunk {i}", "doc", i, DocType.TEXT, {}) for i in range(5)]
+    start = time.perf_counter()
+    results = await Extractor().extract(chunks)
+    elapsed = time.perf_counter() - start
+
+    assert len(results) == 5
+    assert elapsed < 0.12
+
+
+def test_qa_intent_changes_context_limit():
+    assert QAAgent._context_limit_for_intent(QueryIntent.FACTOID) == 6
+    assert QAAgent._context_limit_for_intent(QueryIntent.ANALYTICAL) == 10
+
+
+@pytest.mark.asyncio
+async def test_cdc_processor_invokes_update_handler():
+    calls = []
+
+    async def handler(change):
+        calls.append(change)
+        return type(
+            "Result",
+            (),
+            {
+                "change": change,
+                "vectors_added": 3,
+                "vectors_deleted": 1,
+                "entities_added": 2,
+                "entities_updated": 0,
+                "relations_added": 1,
+                "success": True,
+                "error": "",
+            },
+        )()
+
+    processor = CDCProcessor(update_handler=handler)
+    event = CDCProcessor.from_filesystem_event("modified", "fund.txt", "old", "new")
+
+    result = await processor.process_event(event)
+
+    assert calls[0].file_path == "fund.txt"
+    assert calls[0].change_type == ChangeType.MODIFIED
+    assert result.update_result["vectors_added"] == 3
+    assert result.entities_affected == 2
+
+
+def test_embedding_worker_sends_ready_signal(monkeypatch):
+    import multiprocessing
+    import sys
+    import types
+
+    class FakeSentenceTransformer:
+        def __init__(self, model_name, device="cpu"):
+            self.model_name = model_name
+
+        def encode(self, texts, show_progress_bar=False):
+            class Encoded:
+                @staticmethod
+                def tolist():
+                    return [[0.1, 0.2]]
+
+            return Encoded()
+
+    module = types.ModuleType("sentence_transformers")
+    module.SentenceTransformer = FakeSentenceTransformer
+    monkeypatch.setitem(sys.modules, "sentence_transformers", module)
+
+    request_queue = multiprocessing.Queue()
+    response_queue = multiprocessing.Queue()
+    request_queue.put(("shutdown", None))
+
+    _worker_process(request_queue, response_queue)
+
+    assert response_queue.get(timeout=1)[0] == "ready"
+
+
+def test_sentence_aware_chunking_does_not_split_mid_word():
+    parser = DocParserAgent()
+    parser.CHUNK_SIZE = 45
+    parser.CHUNK_OVERLAP = 8
+    text = "First sentence stays whole. Second sentence also stays whole. Third sentence closes."
+
+    chunks = parser._chunk_texts([text], "doc", DocType.TEXT, "source.txt")
+
+    assert len(chunks) >= 2
+    assert all(not chunk.content.startswith("ence") for chunk in chunks)
+    assert chunks[0].content.endswith(".")
+
+
+def test_image_prepare_downscales_large_images():
+    from PIL import Image
+
+    parser = DocParserAgent()
+    image = Image.new("RGB", (4000, 2000))
+
+    prepared = parser._prepare_image_for_llm(image)
+
+    assert max(prepared.size) == parser.IMAGE_MAX_SIDE
+
+
+def test_entity_deduplicate_keeps_richer_description():
+    first = ExtractionResult([Entity("Fund A", "Product", "short", confidence=0.95)], [], [], "c1")
+    second = ExtractionResult(
+        [Entity("Fund A", "Product", "much richer description", confidence=0.96)],
+        [],
+        [],
+        "c2",
+    )
+
+    deduped = KnowledgeExtractAgent._deduplicate([first, second])
+
+    assert deduped[0].entities[0].description == "much richer description"
+    assert deduped[1].entities == []
+
+
+@pytest.mark.asyncio
+async def test_update_version_uses_existing_graph_state():
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Fund A", "Product"), version=4)
+    agent = KnowledgeUpdateAgent(knowledge_graph=graph)
+
+    version = await agent._next_version("Fund A")
+
+    assert version == 5
+
+
+def test_subprocess_embedding_fallback_keeps_dimension(monkeypatch):
+    monkeypatch.setenv("DISABLE_LOCAL_EMBEDDINGS", "1")
+    embeddings = _SubprocessEmbeddings()
+    embeddings._client = None
+
+    assert len(embeddings.embed_query("anything")) == embeddings.dimensions
+    assert len(embeddings.embed_documents(["a"])[0]) == embeddings.dimensions
+
+
+def test_cdc_diff_preserves_order_and_duplicates():
+    diff = CDCProcessor.compute_diff("a\nb\nb\nc", "a\nb\nb\nd\nc")
+
+    assert diff["operations"]
+    assert diff["added_lines"] == ["d"]
+    assert diff["removed_lines"] == []
+    assert diff["operations"][0]["after_start"] == 3
+
+
+@pytest.mark.asyncio
+async def test_memory_search_entities_is_case_insensitive():
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Global Income Fund", "Product", "Liquidity Buffer"))
+
+    matches = await graph.search_entities("liquidity")
+
+    assert matches[0]["name"] == "Global Income Fund"

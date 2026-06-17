@@ -10,8 +10,10 @@ Core capabilities:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -67,6 +69,7 @@ class DocParserAgent:
 
     CHUNK_SIZE = 512
     CHUNK_OVERLAP = 64
+    IMAGE_MAX_SIDE = 1600
 
     def __init__(self) -> None:
         self.llm = create_chat_model()
@@ -93,10 +96,17 @@ class DocParserAgent:
         return chunks
 
     async def parse_batch(self, file_paths: list[str]) -> list[DocumentChunk]:
-        """Parse multiple files in a batch"""
+        """Parse multiple files concurrently with bounded fanout."""
+        semaphore = asyncio.Semaphore(4)
+
+        async def _parse_one(file_path: str) -> list[DocumentChunk]:
+            async with semaphore:
+                return await self.parse(file_path)
+
+        parsed_files = await asyncio.gather(*(_parse_one(fp) for fp in file_paths))
         all_chunks: list[DocumentChunk] = []
-        for fp in file_paths:
-            all_chunks.extend(await self.parse(fp))
+        for chunks in parsed_files:
+            all_chunks.extend(chunks)
         return all_chunks
 
     # classification
@@ -134,15 +144,22 @@ class DocParserAgent:
         return texts
 
     async def _pdf_vision_fallback(self, file_path: str) -> list[str]:
-        """Use LLM vision when plain-text PDF extraction fails"""
-        try:
-            from pdf2image import convert_from_path
+        """Use LLM vision when plain-text PDF extraction fails.
 
-            images = convert_from_path(file_path, dpi=150, first_page=1, last_page=5)
+        Pages are rendered one at a time so large scanned PDFs do not require
+        loading every page image into memory at once.
+        """
+        try:
+            from pdf2image import convert_from_path, pdfinfo_from_path
+
             texts: list[str] = []
-            for img in images:
-                description = await self._describe_image_with_llm(img)
-                texts.append(description)
+            page_count = int(pdfinfo_from_path(file_path).get("Pages", 0))
+            for page_number in range(1, page_count + 1):
+                images = convert_from_path(file_path, dpi=120, first_page=page_number, last_page=page_number)
+                if not images:
+                    continue
+                description = await self._describe_image_with_llm(images[0])
+                texts.append(f"[Page {page_number}]\n{description}")
             return texts
         except Exception:
             return [f"[PDF vision parsing failed] {file_path}"]
@@ -175,19 +192,31 @@ class DocParserAgent:
         import base64
         import io
 
+        image = self._prepare_image_for_llm(image)
         buf = io.BytesIO()
-        image.save(buf, format="PNG")
+        image.save(buf, format="JPEG", quality=85, optimize=True)
         b64 = base64.b64encode(buf.getvalue()).decode()
 
         messages = [
             SystemMessage(content="You are a professional document analysis assistant. Describe the image in detail, including text, tables, and chart information."),
             HumanMessage(content=[
                 {"type": "text", "text": "Describe all content in this image:"},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
             ]),
         ]
         resp = await self.llm.ainvoke(messages)
         return resp.content
+
+    def _prepare_image_for_llm(self, image: Any) -> Any:
+        """Downscale and normalize images before base64 encoding."""
+        if image.mode not in {"RGB", "L"}:
+            image = image.convert("RGB")
+        width, height = image.size
+        max_side = max(width, height)
+        if max_side > self.IMAGE_MAX_SIDE:
+            scale = self.IMAGE_MAX_SIDE / max_side
+            image = image.resize((int(width * scale), int(height * scale)))
+        return image
 
     # table parsing
     async def _parse_table(self, file_path: str) -> list[str]:
@@ -257,10 +286,7 @@ class DocParserAgent:
         chunks: list[DocumentChunk] = []
         idx = 0
         for text in texts:
-            start = 0
-            while start < len(text):
-                end = start + self.CHUNK_SIZE
-                content = text[start:end]
+            for start, end, content in self._sentence_aware_spans(text):
                 if content.strip():
                     chunks.append(DocumentChunk(
                         content=content.strip(),
@@ -270,5 +296,40 @@ class DocParserAgent:
                         metadata={"source": source, "char_start": start, "char_end": end},
                     ))
                     idx += 1
-                start = end - self.CHUNK_OVERLAP
+        return chunks
+
+    def _sentence_aware_spans(self, text: str) -> list[tuple[int, int, str]]:
+        sentence_matches = list(re.finditer(r"[^.!?\n]+(?:[.!?]+|\n+|$)", text))
+        spans = [(match.start(), match.end(), match.group().strip()) for match in sentence_matches if match.group().strip()]
+        if not spans:
+            spans = [(0, len(text), text)]
+
+        chunks: list[tuple[int, int, str]] = []
+        current_parts: list[str] = []
+        current_start = spans[0][0]
+        current_end = spans[0][1]
+
+        for start, end, sentence in spans:
+            candidate = " ".join([*current_parts, sentence]).strip()
+            if current_parts and len(candidate) > self.CHUNK_SIZE:
+                content = " ".join(current_parts).strip()
+                chunks.append((current_start, current_end, content))
+                overlap_text = content[-self.CHUNK_OVERLAP :].rsplit(" ", 1)[0]
+                current_parts = [overlap_text, sentence] if overlap_text else [sentence]
+                current_start = max(current_start, current_end - len(overlap_text)) if overlap_text else start
+                current_end = end
+            else:
+                current_parts.append(sentence)
+                current_end = end
+
+            while current_parts and len(" ".join(current_parts)) > self.CHUNK_SIZE * 1.5:
+                long_text = " ".join(current_parts)
+                split_at = long_text.rfind(" ", 0, self.CHUNK_SIZE)
+                split_at = split_at if split_at > 0 else self.CHUNK_SIZE
+                chunks.append((current_start, current_start + split_at, long_text[:split_at].strip()))
+                current_parts = [long_text[max(0, split_at - self.CHUNK_OVERLAP) :].strip()]
+                current_start += max(0, split_at - self.CHUNK_OVERLAP)
+
+        if current_parts:
+            chunks.append((current_start, len(text), " ".join(current_parts).strip()))
         return chunks

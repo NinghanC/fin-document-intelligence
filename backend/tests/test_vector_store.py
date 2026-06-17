@@ -37,6 +37,11 @@ class DummyChromaStore:
         distances = [0.123 for _ in documents]
         return {"documents": [documents], "metadatas": [metadatas], "distances": [distances]}
 
+    def count(self) -> int:
+        if not self.added:
+            return 0
+        return len(self.added[-1]["ids"])
+
 
 @pytest.mark.asyncio
 async def test_vector_store_add_and_search(monkeypatch):
@@ -64,7 +69,6 @@ async def test_vector_store_add_and_search(monkeypatch):
 
     count = await service.add_chunks(chunks)
     assert count == 2
-    assert service._stored_count == 2
 
     results = await service.search("Hello")
     assert len(results) == 2
@@ -96,7 +100,24 @@ async def test_vector_store_delete_by_doc_id(monkeypatch):
     deleted = await service.delete_by_doc_id("doc-1")
     assert deleted == 2
     assert service._store.deleted == ["doc-1#chunk-0", "doc-1#chunk-1"]
-    assert service._stored_count == 0
+
+
+@pytest.mark.asyncio
+async def test_chroma_stats_reads_collection_count(monkeypatch):
+    service = VectorStoreService()
+    service._backend = "chroma"
+    service._store = DummyChromaStore()
+    monkeypatch.setattr(service, "_embeddings", DummyEmbeddings())
+
+    chunks = [
+        DocumentChunk("A", "doc", 0, DocType.TEXT, {}),
+        DocumentChunk("B", "doc", 1, DocType.TEXT, {}),
+    ]
+    await service.add_chunks(chunks)
+
+    stats = await service.get_stats()
+
+    assert stats["total_vectors"] == 2
 
 
 @pytest.mark.asyncio

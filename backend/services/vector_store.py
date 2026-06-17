@@ -26,28 +26,30 @@ class _SubprocessEmbeddings:
     """Embedding wrapper that delegates to a separate subprocess to avoid
     PyTorch segfaults from crashing the main server process."""
 
+    dimensions = 768
+
     def __init__(self):
         from services.embedding_worker import get_embedding_client
         self._client = get_embedding_client()
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         if self._client is None:
-            return [[0.0]] * len(texts)
+            return [[0.0] * self.dimensions for _ in texts]
         return self._client.encode(texts)
 
     def embed_query(self, text: str) -> list[float]:
         if self._client is None:
-            return [0.0]
+            return [0.0] * self.dimensions
         return self._client.encode([text])[0]
 
     async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
         if self._client is None:
-            return [[0.0]] * len(texts)
+            return [[0.0] * self.dimensions for _ in texts]
         return await self._client.aencode(texts)
 
     async def aembed_query(self, text: str) -> list[float]:
         if self._client is None:
-            return [0.0]
+            return [0.0] * self.dimensions
         result = await self._client.aencode([text])
         return result[0]
 
@@ -106,6 +108,7 @@ class VectorStoreService:
         self._embeddings: Any = None
         self._store: Any = None
         self._backend = settings.vector_store_type
+        self._pg_engine: Any = None
         from concurrent.futures import ThreadPoolExecutor
         self._executor = ThreadPoolExecutor(max_workers=2)
 
@@ -204,7 +207,6 @@ class VectorStoreService:
                     ids=ids,
                     embeddings=embeddings,
                 )
-                self._stored_count = getattr(self, '_stored_count', 0) + len(chunks)
                 return len(chunks)
 
             if self._backend == "pgvector":
@@ -263,20 +265,21 @@ class VectorStoreService:
             ids = existing.get("ids", [])
             if ids:
                 await self._run_sync(self._store.delete, ids=ids)
-                self._stored_count = max(0, getattr(self, "_stored_count", 0) - len(ids))
             return len(ids)
         if self._backend == "pgvector":
             return await self._delete_pgvector_by_doc_id(doc_id)
         return 0
 
     async def get_stats(self) -> dict:
-        """Get vector store statistics (chromadb is unstable in async contexts, so use the cached count)"""
+        """Get vector store statistics from the active backend."""
         if self._backend == "chroma":
             if self._store is None:
                 return {"backend": "chroma", "total_vectors": 0, "collection": self.COLLECTION_NAME}
-            # Avoid chromadb C-extension calls in async context (may segfault).
-            # Count is maintained manually via _stored_count.
-            return {"backend": "chroma", "total_vectors": getattr(self, '_stored_count', 0), "collection": self.COLLECTION_NAME}
+            try:
+                total_vectors = await self._run_sync(self._store.count)
+            except Exception:
+                total_vectors = 0
+            return {"backend": "chroma", "total_vectors": total_vectors, "collection": self.COLLECTION_NAME}
         return {
             "backend": "pgvector",
             "collection": self.COLLECTION_NAME,
@@ -286,26 +289,22 @@ class VectorStoreService:
     async def _delete_pgvector_by_doc_id(self, doc_id: str) -> int:
         """Delete PGVector rows whose metadata belongs to the given document."""
         def _delete() -> int:
-            from sqlalchemy import create_engine, text
+            from sqlalchemy import text
 
-            engine = create_engine(settings.pgvector_dsn)
-            try:
-                with engine.begin() as conn:
-                    result = conn.execute(
-                        text(
-                            """
-                            DELETE FROM langchain_pg_embedding AS e
-                            USING langchain_pg_collection AS c
-                            WHERE e.collection_id = c.uuid
-                              AND c.name = :collection
-                              AND e.cmetadata ->> 'doc_id' = :doc_id
-                            """
-                        ),
-                        {"collection": self.COLLECTION_NAME, "doc_id": doc_id},
-                    )
-                    return result.rowcount or 0
-            finally:
-                engine.dispose()
+            with self._pgvector_engine().begin() as conn:
+                result = conn.execute(
+                    text(
+                        """
+                        DELETE FROM langchain_pg_embedding AS e
+                        USING langchain_pg_collection AS c
+                        WHERE e.collection_id = c.uuid
+                          AND c.name = :collection
+                          AND e.cmetadata ->> 'doc_id' = :doc_id
+                        """
+                    ),
+                    {"collection": self.COLLECTION_NAME, "doc_id": doc_id},
+                )
+                return result.rowcount or 0
 
         try:
             return await self._run_sync(_delete)
@@ -315,28 +314,31 @@ class VectorStoreService:
     async def _count_pgvector_vectors(self) -> int:
         """Count vectors stored in the configured PGVector collection."""
         def _count() -> int:
-            from sqlalchemy import create_engine, text
+            from sqlalchemy import text
 
-            engine = create_engine(settings.pgvector_dsn)
-            try:
-                with engine.begin() as conn:
-                    result = conn.execute(
-                        text(
-                            """
-                            SELECT COUNT(*) AS cnt
-                            FROM langchain_pg_embedding AS e
-                            JOIN langchain_pg_collection AS c
-                              ON e.collection_id = c.uuid
-                            WHERE c.name = :collection
-                            """
-                        ),
-                        {"collection": self.COLLECTION_NAME},
-                    )
-                    return int(result.scalar() or 0)
-            finally:
-                engine.dispose()
+            with self._pgvector_engine().begin() as conn:
+                result = conn.execute(
+                    text(
+                        """
+                        SELECT COUNT(*) AS cnt
+                        FROM langchain_pg_embedding AS e
+                        JOIN langchain_pg_collection AS c
+                          ON e.collection_id = c.uuid
+                        WHERE c.name = :collection
+                        """
+                    ),
+                    {"collection": self.COLLECTION_NAME},
+                )
+                return int(result.scalar() or 0)
 
         try:
             return await self._run_sync(_count)
         except Exception:
             return 0
+
+    def _pgvector_engine(self) -> Any:
+        if self._pg_engine is None:
+            from sqlalchemy import create_engine
+
+            self._pg_engine = create_engine(settings.pgvector_dsn, pool_pre_ping=True)
+        return self._pg_engine

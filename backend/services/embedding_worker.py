@@ -25,6 +25,7 @@ def _worker_process(request_queue: multiprocessing.Queue, response_queue: multip
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer(_MODEL_NAME, device=_DEVICE)
         model.encode("warmup", show_progress_bar=False)
+        response_queue.put(("ready", _MODEL_NAME))
         print(f"[embedding_worker] Model loaded: {_MODEL_NAME}", flush=True)
     except Exception as e:
         response_queue.put(("error", str(e)))
@@ -74,6 +75,8 @@ class EmbeddingClient:
             result = self._response_queue.get(timeout=60)
             if result[0] == "error":
                 raise RuntimeError(f"Worker failed to load model: {result[1]}")
+            if result[0] != "ready":
+                raise RuntimeError(f"Unexpected embedding worker startup response: {result[0]}")
         except queue.Empty as exc:
             raise RuntimeError("Embedding worker timed out during startup") from exc
 

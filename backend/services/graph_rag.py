@@ -98,7 +98,7 @@ class GraphRAGPipeline:
         entities = await entity_task
         vector_results, subgraph_results, path_results, community_results = await asyncio.gather(
             vector_task,
-            self._subgraph_search(entities),
+            self._subgraph_search(entities, query=query),
             self._path_search(entities),
             self._community_retrieve(entities),
         )
@@ -171,7 +171,7 @@ class GraphRAGPipeline:
         return best_name if best_score >= 0.82 else None
 
     # Step 3: Subgraph retrieval
-    async def _subgraph_search(self, entities: list[str], hops: int = 2) -> list[GraphRAGContext]:
+    async def _subgraph_search(self, entities: list[str], query: str = "", hops: int = 2) -> list[GraphRAGContext]:
         contexts: list[GraphRAGContext] = []
         for entity_name in entities:
             neighbors = await self.knowledge_graph.get_neighbors(entity_name, hops=hops)
@@ -186,8 +186,14 @@ class GraphRAGPipeline:
                 contexts.append(GraphRAGContext(
                     content=content,
                     source_type="subgraph",
-                    score=0.75,
-                    metadata={"entity": entity_name, "hops": hops},
+                    score=self._subgraph_score(
+                        query=query or " ".join(entities),
+                        query_entities=entities,
+                        entity=entity_name,
+                        record=record,
+                        content=content,
+                    ),
+                    metadata={"entity": entity_name, "hops": hops, "score_method": "lexical_entity_relation"},
                 ))
         return contexts
 
@@ -221,11 +227,12 @@ class GraphRAGPipeline:
                             path_str += node
                             if k < len(rels):
                                 path_str += f" --[{rels[k]}]--> "
+                        content = f"Reasoning path: {path_str}"
                         contexts.append(GraphRAGContext(
-                            content=f"Reasoning path: {path_str}",
+                            content=content,
                             source_type="path",
-                            score=0.85,
-                            metadata={"from": entities[i], "to": entities[j]},
+                            score=self._path_score(entities[i], entities[j], nodes, rels),
+                            metadata={"from": entities[i], "to": entities[j], "score_method": "entity_coverage_path_length"},
                         ))
                 except Exception:
                     continue
@@ -241,10 +248,11 @@ class GraphRAGPipeline:
             GraphRAGContext(
                 content=summary.get("summary", ""),
                 source_type="community",
-                score=0.7,
+                score=self._community_score(entities, summary),
                 metadata={
                     "community_id": summary.get("community_id", ""),
                     "members": summary.get("members", []),
+                    "score_method": "member_overlap_lexical",
                 },
             )
             for summary in summaries
@@ -277,6 +285,55 @@ class GraphRAGPipeline:
     @staticmethod
     def _normalize_entity_name(value: str) -> str:
         return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", value.lower())).strip()
+
+    @classmethod
+    def _token_set(cls, text: str) -> set[str]:
+        return {token for token in re.findall(r"\w{3,}", cls._normalize_entity_name(text))}
+
+    @classmethod
+    def _lexical_similarity(cls, query: str, content: str) -> float:
+        query_tokens = cls._token_set(query)
+        if not query_tokens:
+            return 0.0
+        content_tokens = cls._token_set(content)
+        return len(query_tokens & content_tokens) / len(query_tokens)
+
+    @classmethod
+    def _subgraph_score(
+        cls,
+        query: str,
+        query_entities: list[str],
+        entity: str,
+        record: dict[str, Any],
+        content: str,
+    ) -> float:
+        entity_score = 1.0 if entity in query_entities else 0.5
+        target = str(record.get("target", ""))
+        target_score = 0.2 if target and target in query_entities else 0.0
+        relation_count = len(record.get("relations", []))
+        relation_score = min(relation_count / 3, 1.0)
+        lexical_score = cls._lexical_similarity(query, content)
+        score = (entity_score * 0.4) + (target_score * 0.2) + (relation_score * 0.2) + (lexical_score * 0.2)
+        return round(min(score, 1.0), 4)
+
+    @staticmethod
+    def _path_score(start: str, end: str, nodes: list[str], rels: list[str]) -> float:
+        if not nodes:
+            return 0.0
+        coverage = (int(start in nodes) + int(end in nodes)) / 2
+        path_length_penalty = 1 / max(len(rels), 1)
+        score = (coverage * 0.7) + (path_length_penalty * 0.3)
+        return round(min(score, 1.0), 4)
+
+    @classmethod
+    def _community_score(cls, entities: list[str], summary: dict[str, Any]) -> float:
+        members = {str(member) for member in summary.get("members", [])}
+        if not entities:
+            return 0.0
+        member_overlap = len(set(entities) & members) / len(set(entities))
+        lexical_score = cls._lexical_similarity(" ".join(entities), str(summary.get("summary", "")))
+        score = (member_overlap * 0.7) + (lexical_score * 0.3)
+        return round(min(score, 1.0), 4)
 
     @staticmethod
     def _dedup_key(content: str) -> str:

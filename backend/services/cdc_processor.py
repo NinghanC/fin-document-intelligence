@@ -17,10 +17,13 @@ Incremental update flow:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from typing import Any
 
 from config import settings
@@ -48,6 +51,7 @@ class CDCProcessResult:
     version: int = 0
     success: bool = True
     error: str = ""
+    update_result: dict[str, Any] | None = None
 
 
 class CDCProcessor:
@@ -61,10 +65,14 @@ class CDCProcessor:
       4. Version tracking: increment the version on each update and support rollback
     """
 
-    def __init__(self) -> None:
+    def __init__(self, update_handler: Callable[[Any], Awaitable[Any]] | None = None) -> None:
         self._version_map: dict[str, int] = {}
         self._event_log: list[CDCEvent] = []
         self._processing_queue: list[CDCEvent] = []
+        self._update_handler = update_handler
+
+    def set_update_handler(self, update_handler: Callable[[Any], Awaitable[Any]] | None) -> None:
+        self._update_handler = update_handler
 
     # Event Normalization
     @staticmethod
@@ -104,19 +112,35 @@ class CDCProcessor:
         before_lines = before.splitlines() if before else []
         after_lines = after.splitlines() if after else []
 
-        before_set = set(before_lines)
-        after_set = set(after_lines)
+        added: list[str] = []
+        removed: list[str] = []
+        operations: list[dict[str, Any]] = []
+        matcher = SequenceMatcher(a=before_lines, b=after_lines, autojunk=False)
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "equal":
+                continue
+            removed_lines = before_lines[i1:i2]
+            added_lines = after_lines[j1:j2]
+            removed.extend(removed_lines)
+            added.extend(added_lines)
+            operations.append({
+                "op": tag,
+                "before_start": i1,
+                "before_end": i2,
+                "after_start": j1,
+                "after_end": j2,
+                "removed": removed_lines,
+                "added": added_lines,
+            })
 
-        added = after_set - before_set
-        removed = before_set - after_set
-
-        change_ratio = len(added | removed) / max(len(before_lines) + len(after_lines), 1)
+        change_ratio = (len(added) + len(removed)) / max(len(before_lines) + len(after_lines), 1)
 
         return {
-            "added_lines": list(added),
-            "removed_lines": list(removed),
+            "added_lines": added,
+            "removed_lines": removed,
             "added_count": len(added),
             "removed_count": len(removed),
+            "operations": operations,
             "change_ratio": round(change_ratio, 4),
             "is_major_change": change_ratio > 0.3,
         }
@@ -160,6 +184,23 @@ class CDCProcessor:
                     else:
                         result.chunks_affected = max(1, diff["added_count"] // 10)
 
+            update_result = await self._apply_update(event)
+            if update_result is not None:
+                result.update_result = self._serialize_update_result(update_result)
+                result.chunks_affected = (
+                    getattr(update_result, "vectors_added", 0)
+                    - getattr(update_result, "vectors_deleted", 0)
+                    or result.chunks_affected
+                )
+                result.entities_affected = (
+                    getattr(update_result, "entities_added", 0)
+                    + getattr(update_result, "entities_updated", 0)
+                    or result.entities_affected
+                )
+                if not getattr(update_result, "success", True):
+                    result.success = False
+                    result.error = getattr(update_result, "error", "")
+
             self._event_log.append(event)
         except Exception as e:
             result.success = False
@@ -194,7 +235,7 @@ class CDCProcessor:
 
         try:
             while True:
-                msg = consumer.poll(timeout=1.0)
+                msg = await asyncio.to_thread(consumer.poll, 1.0)
                 if msg is None or msg.error():
                     continue
                 value = msg.value()
@@ -204,6 +245,37 @@ class CDCProcessor:
                 await self.process_event(event)
         finally:
             consumer.close()
+
+    async def _apply_update(self, event: CDCEvent) -> Any | None:
+        if self._update_handler is None:
+            return None
+        from agents.knowledge_update_agent import ChangeType, DocumentChange
+
+        operation_map = {
+            "INSERT": ChangeType.CREATED,
+            "CREATE": ChangeType.CREATED,
+            "UPDATE": ChangeType.MODIFIED,
+            "MODIFY": ChangeType.MODIFIED,
+            "DELETE": ChangeType.DELETED,
+        }
+        change_type = operation_map.get(event.operation.upper(), ChangeType.MODIFIED)
+        change = DocumentChange(file_path=event.resource_path, change_type=change_type)
+        return await self._update_handler(change)
+
+    @staticmethod
+    def _serialize_update_result(update_result: Any) -> dict[str, Any]:
+        change = getattr(update_result, "change", None)
+        return {
+            "file_path": getattr(change, "file_path", ""),
+            "change_type": getattr(getattr(change, "change_type", None), "value", ""),
+            "vectors_added": getattr(update_result, "vectors_added", 0),
+            "vectors_deleted": getattr(update_result, "vectors_deleted", 0),
+            "entities_added": getattr(update_result, "entities_added", 0),
+            "entities_updated": getattr(update_result, "entities_updated", 0),
+            "relations_added": getattr(update_result, "relations_added", 0),
+            "success": getattr(update_result, "success", True),
+            "error": getattr(update_result, "error", ""),
+        }
 
     # Stats & History
     def get_stats(self) -> dict[str, Any]:

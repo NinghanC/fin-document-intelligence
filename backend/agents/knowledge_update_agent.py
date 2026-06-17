@@ -136,8 +136,9 @@ class KnowledgeUpdateAgent:
         return changes
 
     # watchdog mode
-    def start_watching(self, directory: str) -> None:
+    def start_watching(self, directory: str, loop: Any = None) -> Any:
         """Start file system watching (non-blocking, runs in a separate thread)"""
+        import asyncio
         import threading
 
         from watchdog.events import FileSystemEventHandler
@@ -145,24 +146,27 @@ class KnowledgeUpdateAgent:
 
         agent = self
 
+        def _submit(change: DocumentChange) -> None:
+            if loop and loop.is_running():
+                asyncio.run_coroutine_threadsafe(agent.process_change(change), loop)
+                return
+            asyncio.run(agent.process_change(change))
+
         class _Handler(FileSystemEventHandler):
             def on_created(self, event):
                 if not event.is_directory:
-                    import asyncio
                     change = DocumentChange(file_path=event.src_path, change_type=ChangeType.CREATED)
-                    asyncio.run(agent.process_change(change))
+                    _submit(change)
 
             def on_modified(self, event):
                 if not event.is_directory:
-                    import asyncio
                     change = DocumentChange(file_path=event.src_path, change_type=ChangeType.MODIFIED)
-                    asyncio.run(agent.process_change(change))
+                    _submit(change)
 
             def on_deleted(self, event):
                 if not event.is_directory:
-                    import asyncio
                     change = DocumentChange(file_path=event.src_path, change_type=ChangeType.DELETED)
-                    asyncio.run(agent.process_change(change))
+                    _submit(change)
 
         observer = Observer()
         observer.schedule(_Handler(), directory, recursive=True)
@@ -178,6 +182,7 @@ class KnowledgeUpdateAgent:
 
         t = threading.Thread(target=_run, daemon=True)
         t.start()
+        return observer
 
     # kafka CDC mode
     async def start_kafka_consumer(self) -> None:
@@ -229,7 +234,7 @@ class KnowledgeUpdateAgent:
             extractions = await self.knowledge_extractor.extract(chunks)
             for ext in extractions:
                 for ent in ext.entities:
-                    version = self._bump_version(ent.name)
+                    version = await self._next_version(ent.name)
                     await self.knowledge_graph.upsert_entity(ent, version=version, source=ext.source_chunk_id)
                     result.entities_added += 1
                 for rel in ext.relations:
@@ -269,7 +274,13 @@ class KnowledgeUpdateAgent:
         import os
         return os.path.abspath(file_path)
 
-    def _bump_version(self, entity_name: str) -> int:
-        ver = self._version_counter.get(entity_name, 0) + 1
+    async def _next_version(self, entity_name: str) -> int:
+        current = self._version_counter.get(entity_name, 0)
+        if self.knowledge_graph:
+            existing = await self.knowledge_graph.get_entity(entity_name)
+            if existing:
+                entity_data = existing.get("e", existing)
+                current = max(current, int(entity_data.get("version", 0) or 0))
+        ver = current + 1
         self._version_counter[entity_name] = ver
         return ver

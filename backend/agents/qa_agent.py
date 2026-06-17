@@ -11,6 +11,7 @@ Core capabilities:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -120,7 +121,7 @@ class QAAgent:
         rewritten = await self._rewrite_query(question)
 
         all_contexts = await self._retrieve_contexts(question, rewritten)
-        top_contexts = self._balanced_top_contexts(all_contexts, limit=8)
+        top_contexts = self._balanced_top_contexts(all_contexts, limit=self._context_limit_for_intent(intent))
 
         answer_text, reasoning = await self._generate_answer(question, top_contexts, intent)
 
@@ -164,6 +165,16 @@ class QAAgent:
                 ctx.score *= self.multimodal.MODALITY_WEIGHTS.get(doc_type, 1.0)
         contexts.sort(key=lambda ctx: ctx.score, reverse=True)
         return contexts
+
+    @staticmethod
+    def _context_limit_for_intent(intent: QueryIntent) -> int:
+        return {
+            QueryIntent.FACTOID: 6,
+            QueryIntent.ANALYTICAL: 10,
+            QueryIntent.COMPARATIVE: 10,
+            QueryIntent.PROCEDURAL: 8,
+            QueryIntent.EXPLORATORY: 10,
+        }.get(intent, 8)
 
     @staticmethod
     def _balanced_top_contexts(contexts: list[RetrievedContext], limit: int = 8) -> list[RetrievedContext]:
@@ -258,9 +269,9 @@ class QAAgent:
                     contexts.append(RetrievedContext(
                         content=str(record),
                         source="knowledge_graph",
-                        score=0.8,
+                        score=self._graph_record_score(question, record),
                         retrieval_type="graph",
-                        metadata={"cypher": cypher},
+                        metadata={"cypher": cypher, "score_method": "lexical_record_overlap"},
                     ))
             except Exception:
                 continue
@@ -270,13 +281,8 @@ class QAAgent:
     @staticmethod
     def _hybrid_rerank(contexts: list[RetrievedContext]) -> list[RetrievedContext]:
         """
-        Hybrid reranking: vector score + weighted graph score
-        Graph retrieval results naturally contain structured relationships, so they receive a slightly higher weight
+        Hybrid reranking based on retrieval scores already computed by each branch.
         """
-        weight_map = {"vector": 1.0, "graph": 1.2, "hybrid": 1.1}
-        for ctx in contexts:
-            ctx.score *= weight_map.get(ctx.retrieval_type, 1.0)
-
         seen: set[str] = set()
         unique: list[RetrievedContext] = []
         for ctx in contexts:
@@ -287,6 +293,21 @@ class QAAgent:
 
         unique.sort(key=lambda c: c.score, reverse=True)
         return unique
+
+    @classmethod
+    def _graph_record_score(cls, question: str, record: dict[str, Any]) -> float:
+        record_text = " ".join(str(value) for value in record.values())
+        query_tokens = cls._token_set(question)
+        if not query_tokens:
+            return 0.0
+        record_tokens = cls._token_set(record_text)
+        lexical_overlap = len(query_tokens & record_tokens) / len(query_tokens)
+        structural_bonus = 0.15 if any(key in record for key in ("relations", "rel_types", "node_names")) else 0.0
+        return round(min(lexical_overlap + structural_bonus, 1.0), 4)
+
+    @staticmethod
+    def _token_set(text: str) -> set[str]:
+        return set(re.findall(r"\w{3,}", text.lower()))
 
     # answer generation
     async def _generate_answer(

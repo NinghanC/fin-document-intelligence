@@ -192,7 +192,8 @@ class KnowledgeGraphService:
             return matches[:limit]
         cypher = """
         MATCH (e:Entity)
-        WHERE e.name CONTAINS $keyword OR e.description CONTAINS $keyword
+        WHERE toLower(e.name) CONTAINS toLower($keyword)
+           OR toLower(coalesce(e.description, '')) CONTAINS toLower($keyword)
         RETURN e.name AS name, e.type AS type, e.description AS description
         LIMIT $limit
         """

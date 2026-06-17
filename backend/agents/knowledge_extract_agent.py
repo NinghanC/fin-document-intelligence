@@ -10,6 +10,7 @@ Core capabilities:
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections import Counter
 from dataclasses import dataclass, field
@@ -99,13 +100,12 @@ class KnowledgeExtractAgent:
 
     # public API
     async def extract(self, chunks: list[DocumentChunk]) -> list[ExtractionResult]:
-        """Extract knowledge from a group of document chunks"""
+        """Extract knowledge from chunks using bounded concurrent batches."""
         results: list[ExtractionResult] = []
         for i in range(0, len(chunks), self.BATCH_SIZE):
             batch = chunks[i : i + self.BATCH_SIZE]
-            for chunk in batch:
-                result = await self._extract_from_chunk(chunk)
-                results.append(result)
+            batch_results = await asyncio.gather(*(self._extract_from_chunk(chunk) for chunk in batch))
+            results.extend(batch_results)
         merged = self._deduplicate(results)
         return merged
 
@@ -208,6 +208,8 @@ class KnowledgeExtractAgent:
                 if entity_key not in seen_entities:
                     seen_entities[entity_key] = ent
                     unique_entities.append(ent)
+                else:
+                    KnowledgeExtractAgent._merge_entity(seen_entities[entity_key], ent)
 
             unique_relations: list[Relation] = []
             for rel in result.relations:
@@ -223,3 +225,16 @@ class KnowledgeExtractAgent:
                 source_chunk_id=result.source_chunk_id,
             ))
         return deduped
+
+    @staticmethod
+    def _merge_entity(existing: Entity, candidate: Entity) -> Entity:
+        """Keep the richer/higher-confidence entity mention."""
+        existing_score = (len(existing.description), existing.confidence)
+        candidate_score = (len(candidate.description), candidate.confidence)
+        if candidate_score > existing_score:
+            existing.description = candidate.description
+            existing.confidence = candidate.confidence
+            existing.properties = {**existing.properties, **candidate.properties}
+            return existing
+        existing.properties = {**candidate.properties, **existing.properties}
+        return existing
