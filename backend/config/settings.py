@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8080
+    api_key: str = ""
+    auth_enabled: bool = False
+    allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
+    rate_limit_requests: int = 60
+    rate_limit_window_seconds: int = 60
+    max_upload_size_mb: int = 10
 
     # Document Store
     upload_dir: str = "./uploads"

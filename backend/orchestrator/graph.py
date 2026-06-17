@@ -11,6 +11,7 @@ Uses LangGraph StateGraph for directed graph orchestration with conditional rout
 
 from __future__ import annotations
 
+import asyncio
 from enum import Enum
 from typing import Annotated, Any
 
@@ -20,7 +21,6 @@ from langgraph.graph.message import add_messages
 from agents.doc_parser_agent import DocParserAgent, DocumentChunk
 from agents.knowledge_extract_agent import ExtractionResult, KnowledgeExtractAgent
 from agents.knowledge_update_agent import (
-    ChangeType,
     DocumentChange,
     KnowledgeUpdateAgent,
     UpdateResult,
@@ -92,7 +92,7 @@ def _build_ingest_graph(
     extractor: KnowledgeExtractAgent,
     vector_store: VectorStoreService | None,
     knowledge_graph: KnowledgeGraphService | None,
-) -> StateGraph:
+) -> Any:
 
     async def parse_documents(state: dict) -> dict:
         file_paths = state.get("file_paths", [])
@@ -130,31 +130,40 @@ def _build_ingest_graph(
                 pass
         return {**state, "entities_stored": entity_count}
 
-    graph = StateGraph(dict)
-    graph.add_node("parse", parse_documents)
-    graph.add_node("extract", extract_knowledge)
-    graph.add_node("store_vectors", store_vectors)
-    graph.add_node("store_graph", store_graph)
+    async def store_knowledge(state: dict) -> dict:
+        vector_state, graph_state = await asyncio.gather(
+            store_vectors(state),
+            store_graph(state),
+        )
+        return {
+            **state,
+            "vectors_stored": vector_state.get("vectors_stored", 0),
+            "entities_stored": graph_state.get("entities_stored", 0),
+        }
+
+    graph = StateGraph(dict)  # type: ignore[type-var]
+    graph.add_node("parse", parse_documents)  # type: ignore[type-var]
+    graph.add_node("extract", extract_knowledge)  # type: ignore[type-var]
+    graph.add_node("store", store_knowledge)  # type: ignore[type-var]
 
     graph.set_entry_point("parse")
     graph.add_edge("parse", "extract")
-    graph.add_edge("extract", "store_vectors")
-    graph.add_edge("store_vectors", "store_graph")
-    graph.add_edge("store_graph", END)
+    graph.add_edge("extract", "store")
+    graph.add_edge("store", END)
 
     return graph.compile()
 
 
 # QA Pipeline
-def _build_qa_graph(qa_agent: QAAgent) -> StateGraph:
+def _build_qa_graph(qa_agent: QAAgent) -> Any:
 
     async def process_question(state: dict) -> dict:
         question = state.get("question", "")
         result = await qa_agent.answer(question)
         return {**state, "result": result}
 
-    graph = StateGraph(dict)
-    graph.add_node("answer", process_question)
+    graph = StateGraph(dict)  # type: ignore[type-var]
+    graph.add_node("answer", process_question)  # type: ignore[type-var]
     graph.set_entry_point("answer")
     graph.add_edge("answer", END)
 
@@ -162,7 +171,7 @@ def _build_qa_graph(qa_agent: QAAgent) -> StateGraph:
 
 
 # Update Pipeline
-def _build_update_graph(update_agent: KnowledgeUpdateAgent) -> StateGraph:
+def _build_update_graph(update_agent: KnowledgeUpdateAgent) -> Any:
 
     async def process_updates(state: dict) -> dict:
         changes = state.get("changes", [])
@@ -183,9 +192,9 @@ def _build_update_graph(update_agent: KnowledgeUpdateAgent) -> StateGraph:
         all_results = [r for r in results if r.success] + retried
         return {**state, "results": all_results}
 
-    graph = StateGraph(dict)
-    graph.add_node("process", process_updates)
-    graph.add_node("retry", retry_failed)
+    graph = StateGraph(dict)  # type: ignore[type-var]
+    graph.add_node("process", process_updates)  # type: ignore[type-var]
+    graph.add_node("retry", retry_failed)  # type: ignore[type-var]
 
     graph.set_entry_point("process")
     graph.add_conditional_edges("process", should_continue, {"retry": "retry", "done": END})

@@ -1,0 +1,23 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["backend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501", "B008", "UP042"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "backend"
+explicit_package_bases = true
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+exclude = ["backend/tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"

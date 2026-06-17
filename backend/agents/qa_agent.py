@@ -16,7 +16,9 @@ from enum import Enum
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
+
 from services.graph_rag import GraphRAGPipeline
+from services.multimodal import MultimodalService
 from utils.model_clients import create_chat_model
 
 
@@ -104,6 +106,7 @@ class QAAgent:
         self.llm = create_chat_model()
         self.vector_store = vector_store
         self.knowledge_graph = knowledge_graph
+        self.multimodal = MultimodalService()
         self.graph_rag = (
             GraphRAGPipeline(vector_store, knowledge_graph)
             if vector_store is not None and knowledge_graph is not None
@@ -135,7 +138,7 @@ class QAAgent:
         if self.graph_rag is not None:
             try:
                 graph_rag_contexts = await self.graph_rag.retrieve(question, top_k=20)
-                return [
+                contexts = [
                     RetrievedContext(
                         content=ctx.content,
                         source=ctx.metadata.get("source", ctx.source_type),
@@ -145,12 +148,22 @@ class QAAgent:
                     )
                     for ctx in graph_rag_contexts
                 ]
+                return self._apply_multimodal_weights(contexts)
             except Exception:
                 pass
 
         vector_contexts = await self._vector_retrieve(rewritten)
         graph_contexts = await self._graph_retrieve(question, rewritten)
-        return self._hybrid_rerank(vector_contexts + graph_contexts)
+        return self._apply_multimodal_weights(self._hybrid_rerank(vector_contexts + graph_contexts))
+
+    def _apply_multimodal_weights(self, contexts: list[RetrievedContext]) -> list[RetrievedContext]:
+        """Apply modality-aware reranking to vector contexts before final balancing."""
+        for ctx in contexts:
+            if ctx.retrieval_type == "vector":
+                doc_type = str(ctx.metadata.get("doc_type", ""))
+                ctx.score *= self.multimodal.MODALITY_WEIGHTS.get(doc_type, 1.0)
+        contexts.sort(key=lambda ctx: ctx.score, reverse=True)
+        return contexts
 
     @staticmethod
     def _balanced_top_contexts(contexts: list[RetrievedContext], limit: int = 8) -> list[RetrievedContext]:

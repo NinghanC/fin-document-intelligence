@@ -139,6 +139,7 @@ class KnowledgeUpdateAgent:
     def start_watching(self, directory: str) -> None:
         """Start file system watching (non-blocking, runs in a separate thread)"""
         import threading
+
         from watchdog.events import FileSystemEventHandler
         from watchdog.observers import Observer
 
@@ -182,6 +183,7 @@ class KnowledgeUpdateAgent:
     async def start_kafka_consumer(self) -> None:
         """Start the Kafka CDC consumer"""
         import json
+
         from confluent_kafka import Consumer
 
         conf = {
@@ -199,7 +201,10 @@ class KnowledgeUpdateAgent:
                     continue
                 if msg.error():
                     continue
-                payload = json.loads(msg.value().decode("utf-8"))
+                value = msg.value()
+                if value is None:
+                    continue
+                payload = json.loads(value.decode("utf-8"))
                 change = DocumentChange(
                     file_path=payload["file_path"],
                     change_type=ChangeType(payload["change_type"]),

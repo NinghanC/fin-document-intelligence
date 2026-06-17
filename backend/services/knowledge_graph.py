@@ -11,13 +11,16 @@ Responsibilities:
 
 from __future__ import annotations
 
-import time
 import hashlib
 import os
+import re
+import time
 from typing import Any
 
 from agents.knowledge_extract_agent import Entity, Relation
 from config import settings
+
+WRITE_CYPHER_PATTERN = re.compile(r"\b(CREATE|MERGE|DELETE|SET|REMOVE|DROP|LOAD|CALL\s+dbms)\b", re.IGNORECASE)
 
 
 class KnowledgeGraphService:
@@ -103,9 +106,10 @@ class KnowledgeGraphService:
 
     async def add_relation(self, relation: Relation, source: str = "") -> None:
         """Create relationships between entities"""
+        rel_type = self._sanitize_rel_type(relation.relation)
         rel_record = {
             "head": relation.head,
-            "relation": relation.relation,
+            "relation": rel_type,
             "tail": relation.tail,
             "confidence": relation.confidence,
             "source": source,
@@ -115,7 +119,6 @@ class KnowledgeGraphService:
             self._relations.append(rel_record)
         if not self._driver:
             return
-        rel_type = relation.relation.upper().replace(" ", "_")
         cypher = f"""
         MATCH (h:Entity {{name: $head}})
         MATCH (t:Entity {{name: $tail}})
@@ -132,11 +135,16 @@ class KnowledgeGraphService:
             })
 
     # query operations
-    async def execute_cypher(self, cypher: str, params: dict | None = None) -> list[dict]:
+    async def execute_cypher(self, cypher: str, params: dict | None = None, read_only: bool = True) -> list[dict]:
         """Execute arbitrary Cypher queries"""
+        if read_only and WRITE_CYPHER_PATTERN.search(cypher):
+            raise ValueError("Only read-only Cypher is allowed")
         if not self._driver:
             return []
-        async with self._driver.session() as session:
+
+        from neo4j import READ_ACCESS, WRITE_ACCESS
+        access_mode = READ_ACCESS if read_only else WRITE_ACCESS
+        async with self._driver.session(default_access_mode=access_mode) as session:
             result = await session.run(cypher, params or {})
             records = await result.data()
             return records
@@ -220,6 +228,7 @@ class KnowledgeGraphService:
                 "source_chunk_prefix": f"{source}#chunk-",
                 "doc_id_chunk_prefix": f"{hashlib.sha256(source.encode()).hexdigest()[:16]}#chunk-",
             },
+            read_only=False,
         )
         return records[0].get("deleted", 0) if records else 0
 
@@ -279,3 +288,10 @@ class KnowledgeGraphService:
     def _source_matches(value: str, prefixes: tuple[str, str, str]) -> bool:
         exact, source_chunk_prefix, doc_id_chunk_prefix = prefixes
         return value == exact or value.startswith(source_chunk_prefix) or value.startswith(doc_id_chunk_prefix)
+
+    @staticmethod
+    def _sanitize_rel_type(raw: str) -> str:
+        rel_type = raw.upper().replace(" ", "_")
+        if not re.match(r"^[A-Z_]+$", rel_type):
+            return "RELATED_TO"
+        return rel_type

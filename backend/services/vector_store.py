@@ -15,6 +15,7 @@ import re
 from typing import Any
 
 from langchain_openai import OpenAIEmbeddings
+from pydantic import SecretStr
 
 from agents.doc_parser_agent import DocumentChunk
 from config import settings
@@ -91,7 +92,7 @@ def _create_embeddings():
         return _SubprocessEmbeddings()
     return OpenAIEmbeddings(
         model=settings.embedding_model,
-        api_key=settings.openai_api_key,
+        api_key=SecretStr(settings.openai_api_key),
         base_url=settings.openai_base_url,
     )
 
@@ -117,7 +118,6 @@ class VectorStoreService:
     @property
     def embeddings(self):
         if self._embeddings is None:
-            import os
             # DISABLE_LOCAL_EMBEDDINGS only skips subprocess/local model loading.
             # Hash embeddings keep the public demo searchable without external keys.
             try:
@@ -128,7 +128,6 @@ class VectorStoreService:
 
     @property
     def embeddings_available(self) -> bool:
-        import os
         if self._embeddings is not None:
             return True
         # Try loading; if it fails, stay disabled
@@ -146,8 +145,9 @@ class VectorStoreService:
 
     async def _init_chroma(self) -> None:
         def _init():
-            import chromadb
             import os
+
+            import chromadb
 
             if settings.chroma_mode == "http":
                 client = chromadb.HttpClient(
@@ -188,6 +188,7 @@ class VectorStoreService:
                 **chunk.metadata,
                 "doc_id": chunk.doc_id,
                 "chunk_id": chunk.chunk_id,
+                "doc_type": chunk.doc_type.value,
                 "source": chunk.metadata.get("source", ""),
             }
             for chunk in chunks
@@ -244,7 +245,7 @@ class VectorStoreService:
                     },
                     max(0.0, 1.0 - float(distance)),
                 )
-                for doc, metadata, distance in zip(documents, metadatas, distances)
+                for doc, metadata, distance in zip(documents, metadatas, distances, strict=False)
             ]
 
         results = await self._run_sync(self._store.similarity_search_with_score, query, k=top_k)

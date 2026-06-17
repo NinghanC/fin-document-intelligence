@@ -9,21 +9,23 @@ Provides three endpoint groups:
 
 from __future__ import annotations
 
-import os
-import shutil
 import asyncio
-from contextlib import asynccontextmanager
+import os
+import time
 from collections.abc import Awaitable, Callable
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import structlog
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from agents.doc_parser_agent import DocParserAgent
-from agents.knowledge_extract_agent import KnowledgeExtractAgent
-from agents.knowledge_update_agent import ChangeType, DocumentChange, KnowledgeUpdateAgent
-from agents.qa_agent import QAAgent
+from agents.knowledge_update_agent import ChangeType, DocumentChange
 from config import settings
 from orchestrator.graph import build_knowledge_graph_workflow
 from services.cdc_processor import CDCEvent, CDCProcessor
@@ -35,9 +37,27 @@ knowledge_graph = KnowledgeGraphService()
 cdc_processor = CDCProcessor()
 workflows: dict[str, Any] = {}
 background_tasks: list[asyncio.Task] = []
+_rate_limit_buckets: dict[str, list[float]] = {}
+_request_metrics: dict[str, Any] = {
+    "total_requests": 0,
+    "total_latency_ms": 0.0,
+    "by_path": {},
+}
+
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.add_log_level,
+        structlog.processors.JSONRenderer(),
+    ],
+)
+logger = structlog.get_logger("finsight.api")
+
+ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".csv", ".xlsx", ".xls", ".txt", ".md"}
 
 
-async def _init_with_retry(name: str, init_fn: Callable[[], Awaitable[None]], attempts: int = 10, delay: float = 2.0) -> bool:
+async def _init_with_retry(init_fn: Callable[[], Awaitable[None]], attempts: int = 10, delay: float = 2.0) -> bool:
     """Initialize a service that may start slightly after the API container."""
     for attempt in range(1, attempts + 1):
         try:
@@ -53,8 +73,8 @@ async def _init_with_retry(name: str, init_fn: Callable[[], Awaitable[None]], at
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(settings.upload_dir, exist_ok=True)
-    await _init_with_retry("vector_store", vector_store.init)
-    await _init_with_retry("knowledge_graph", knowledge_graph.init)
+    await _init_with_retry(vector_store.init)
+    await _init_with_retry(knowledge_graph.init)
     workflows.update(
         build_knowledge_graph_workflow(vector_store=vector_store, knowledge_graph=knowledge_graph)
     )
@@ -72,6 +92,86 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key", "X-Request-ID"],
+)
+
+
+@app.middleware("http")
+async def request_context_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", str(uuid4()))
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(request_id=request_id, path=request.url.path, method=request.method)
+    request.state.request_id = request_id
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.exception("request_failed", duration_ms=round(duration_ms, 2), error=str(exc))
+        raise
+
+    duration_ms = (time.perf_counter() - start) * 1000
+    response.headers["X-Request-ID"] = request_id
+    _record_request_metric(request.url.path, duration_ms)
+    logger.info("request_completed", status_code=response.status_code, duration_ms=round(duration_ms, 2))
+    return response
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    if request.url.path.startswith("/static"):
+        return await call_next(request)
+
+    client = request.client.host if request.client else "unknown"
+    now = time.time()
+    window_start = now - settings.rate_limit_window_seconds
+    bucket = [ts for ts in _rate_limit_buckets.get(client, []) if ts >= window_start]
+    if len(bucket) >= settings.rate_limit_requests:
+        return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
+    bucket.append(now)
+    _rate_limit_buckets[client] = bucket
+    return await call_next(request)
+
+
+async def require_api_key(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
+    if not settings.auth_enabled:
+        return
+    if not settings.api_key or x_api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
+def _record_request_metric(path: str, duration_ms: float) -> None:
+    _request_metrics["total_requests"] += 1
+    _request_metrics["total_latency_ms"] += duration_ms
+    by_path = _request_metrics["by_path"]
+    path_stats = by_path.setdefault(path, {"count": 0, "total_latency_ms": 0.0, "last_latency_ms": 0.0})
+    path_stats["count"] += 1
+    path_stats["total_latency_ms"] += duration_ms
+    path_stats["last_latency_ms"] = round(duration_ms, 2)
+
+
+def _request_stats() -> dict[str, Any]:
+    total = _request_metrics["total_requests"]
+    by_path = {
+        path: {
+            "count": stats["count"],
+            "avg_latency_ms": round(stats["total_latency_ms"] / max(stats["count"], 1), 2),
+            "last_latency_ms": stats["last_latency_ms"],
+        }
+        for path, stats in _request_metrics["by_path"].items()
+    }
+    return {
+        "total_requests": total,
+        "avg_latency_ms": round(_request_metrics["total_latency_ms"] / max(total, 1), 2),
+        "by_path": by_path,
+    }
+
 
 # Static Files & Frontend
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
@@ -110,7 +210,8 @@ class IngestResponse(BaseModel):
 class StatsResponse(BaseModel):
     vector_store: dict[str, Any]
     knowledge_graph: dict[str, Any]
-    cdc: dict[str, Any] = {}
+    cdc: dict[str, Any] = Field(default_factory=dict)
+    api: dict[str, Any] = Field(default_factory=dict)
 
 
 class UpdateRequest(BaseModel):
@@ -135,13 +236,58 @@ class CDCEventRequest(BaseModel):
     after: dict[str, Any] | None = None
 
 
+def _validate_upload_content(filename: str, content: bytes) -> None:
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext or 'none'}")
+
+    if ext == ".pdf" and not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Invalid PDF signature")
+    if ext == ".png" and not content.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise HTTPException(status_code=400, detail="Invalid PNG signature")
+    if ext in {".jpg", ".jpeg"} and not content.startswith(b"\xff\xd8\xff"):
+        raise HTTPException(status_code=400, detail="Invalid JPEG signature")
+    if ext == ".xlsx" and not content.startswith(b"PK"):
+        raise HTTPException(status_code=400, detail="Invalid XLSX signature")
+    if ext == ".xls" and not content.startswith(b"\xd0\xcf\x11\xe0"):
+        raise HTTPException(status_code=400, detail="Invalid XLS signature")
+    if ext in {".txt", ".md", ".csv"}:
+        try:
+            content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=400, detail="Text uploads must be UTF-8") from exc
+
+
+async def _save_upload(file: UploadFile) -> tuple[str, str]:
+    safe_name = Path(file.filename or "unknown").name
+    if not safe_name or safe_name in {".", ".."}:
+        raise HTTPException(status_code=400, detail="Invalid file name")
+
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_upload_size_mb}MB limit")
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty upload")
+
+    _validate_upload_content(safe_name, content)
+
+    os.makedirs(settings.upload_dir, exist_ok=True)
+    save_path = os.path.abspath(os.path.join(settings.upload_dir, safe_name))
+    upload_root = os.path.abspath(settings.upload_dir)
+    if not save_path.startswith(upload_root + os.sep):
+        raise HTTPException(status_code=400, detail="Invalid upload path")
+
+    with open(save_path, "wb") as f:
+        f.write(content)
+    return safe_name, save_path
+
+
 # Ingest Endpoints
-@app.post("/api/ingest/upload", response_model=IngestResponse, tags=["Document Ingestion"])
+@app.post("/api/ingest/upload", response_model=IngestResponse, tags=["Document Ingestion"], dependencies=[Depends(require_api_key)])
 async def upload_document(file: UploadFile = File(...)):
     """Upload and parse a document, then automatically ingest it into the vector store and knowledge graph"""
-    save_path = os.path.join(settings.upload_dir, file.filename or "unknown")
-    with open(save_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    safe_name, save_path = await _save_upload(file)
 
     ingest_wf = workflows.get("ingest")
     if not ingest_wf:
@@ -154,7 +300,7 @@ async def upload_document(file: UploadFile = File(...)):
     total_relations = sum(len(e.relations) for e in extractions)
 
     return IngestResponse(
-        file_name=file.filename or "unknown",
+        file_name=safe_name,
         chunks_count=len(chunks),
         entities_count=total_entities,
         relations_count=total_relations,
@@ -162,7 +308,7 @@ async def upload_document(file: UploadFile = File(...)):
     )
 
 
-@app.post("/api/ingest/batch", response_model=list[IngestResponse], tags=["Document Ingestion"])
+@app.post("/api/ingest/batch", response_model=list[IngestResponse], tags=["Document Ingestion"], dependencies=[Depends(require_api_key)])
 async def upload_batch(files: list[UploadFile] = File(...)):
     """Upload documents in a batch"""
     results = []
@@ -173,7 +319,7 @@ async def upload_batch(files: list[UploadFile] = File(...)):
 
 
 # QA Endpoints
-@app.post("/api/qa/ask", response_model=QuestionResponse, tags=["intelligent QA"])
+@app.post("/api/qa/ask", response_model=QuestionResponse, tags=["intelligent QA"], dependencies=[Depends(require_api_key)])
 async def ask_question(req: QuestionRequest):
     """Intelligent QA - hybrid retrieval + knowledge graph reasoning"""
     qa_wf = workflows.get("qa")
@@ -199,7 +345,7 @@ async def ask_question(req: QuestionRequest):
 
 
 # Admin Endpoints
-@app.get("/api/admin/stats", response_model=StatsResponse, tags=["System Administration"])
+@app.get("/api/admin/stats", response_model=StatsResponse, tags=["System Administration"], dependencies=[Depends(require_api_key)])
 async def get_stats():
     """Get system statistics"""
     try:
@@ -210,10 +356,15 @@ async def get_stats():
         kg_stats = await knowledge_graph.get_stats()
     except Exception:
         kg_stats = {"total_entities": 0, "total_relations": 0}
-    return StatsResponse(vector_store=vs_stats, knowledge_graph=kg_stats, cdc=cdc_processor.get_stats())
+    return StatsResponse(
+        vector_store=vs_stats,
+        knowledge_graph=kg_stats,
+        cdc=cdc_processor.get_stats(),
+        api=_request_stats(),
+    )
 
 
-@app.post("/api/admin/update", response_model=UpdateResponse, tags=["System Administration"])
+@app.post("/api/admin/update", response_model=UpdateResponse, tags=["System Administration"], dependencies=[Depends(require_api_key)])
 async def trigger_update(req: UpdateRequest):
     """Manually trigger a knowledge update"""
     update_wf = workflows.get("update")
@@ -241,7 +392,7 @@ async def trigger_update(req: UpdateRequest):
     )
 
 
-@app.post("/api/admin/cdc/events", tags=["System Administration"])
+@app.post("/api/admin/cdc/events", tags=["System Administration"], dependencies=[Depends(require_api_key)])
 async def process_cdc_event(req: CDCEventRequest):
     """Process a normalized CDC event through the incremental CDC processor."""
     event = CDCEvent(
@@ -267,7 +418,20 @@ async def process_cdc_event(req: CDCEventRequest):
 
 @app.get("/api/health", tags=["System Administration"])
 async def health():
-    return {"status": "ok", "name": "FinSight Assistant"}
+    services: dict[str, Any] = {}
+    status = "ok"
+    try:
+        services["vector_store"] = await vector_store.get_stats()
+    except Exception as exc:
+        services["vector_store"] = {"status": "error", "error": str(exc)}
+        status = "degraded"
+    try:
+        services["knowledge_graph"] = await knowledge_graph.get_stats()
+    except Exception as exc:
+        services["knowledge_graph"] = {"status": "error", "error": str(exc)}
+        status = "degraded"
+    services["cdc"] = cdc_processor.get_stats()
+    return {"status": status, "name": "FinSight Assistant", "services": services}
 
 
 if __name__ == "__main__":

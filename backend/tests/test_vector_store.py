@@ -1,10 +1,11 @@
-import pytest
 import sys
 import types
+
+import pytest
 from langchain_core.documents import Document
 
-from agents.doc_parser_agent import DocType, DocumentChunk
 import services.vector_store as vector_store_module
+from agents.doc_parser_agent import DocType, DocumentChunk
 from services.vector_store import VectorStoreService
 
 
@@ -148,7 +149,7 @@ class DummyPGVectorStore:
                 ),
                 0.42,
             )
-            for text, metadata in zip(self.texts[:k], self.metadatas[:k])
+            for text, metadata in zip(self.texts[:k], self.metadatas[:k], strict=False)
         ]
 
 

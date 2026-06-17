@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
+
 from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import VectorStoreService
 from utils.model_clients import create_chat_model

@@ -197,7 +197,10 @@ class CDCProcessor:
                 msg = consumer.poll(timeout=1.0)
                 if msg is None or msg.error():
                     continue
-                event = self.from_kafka_message(msg.value())
+                value = msg.value()
+                if value is None:
+                    continue
+                event = self.from_kafka_message(value)
                 await self.process_event(event)
         finally:
             consumer.close()

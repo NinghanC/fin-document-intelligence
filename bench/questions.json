@@ -1,0 +1,27 @@
+[
+  {
+    "question": "Which fund mentions liquidity constraints?",
+    "expected_source": "Q4_global_income_fund_risk_report.pdf",
+    "expected_terms": ["Global Income Fund", "liquidity"]
+  },
+  {
+    "question": "What risk factors are associated with the bond sleeve?",
+    "expected_source": "Q4_global_income_fund_risk_report.pdf",
+    "expected_terms": ["bond sleeve", "risk"]
+  },
+  {
+    "question": "Which documents mention redemption gates?",
+    "expected_source": "Q4_global_income_fund_risk_report.pdf",
+    "expected_terms": ["redemption gate"]
+  },
+  {
+    "question": "How does the policy describe credit spread exposure?",
+    "expected_source": "fund_policy_notes.md",
+    "expected_terms": ["credit spread"]
+  },
+  {
+    "question": "What source supports the liquidity answer?",
+    "expected_source": "Q4_global_income_fund_risk_report.pdf",
+    "expected_terms": ["Source"]
+  }
+]

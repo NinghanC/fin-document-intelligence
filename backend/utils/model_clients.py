@@ -10,9 +10,9 @@ from typing import Any
 
 from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from config import settings
-
 
 PLACEHOLDER_KEYS = {
     "",
@@ -33,7 +33,7 @@ def create_chat_model() -> Any:
     if has_provider_key():
         return ChatOpenAI(
             model=settings.openai_model,
-            api_key=settings.openai_api_key,
+            api_key=SecretStr(settings.openai_api_key),
             base_url=settings.openai_base_url,
             temperature=0,
         )

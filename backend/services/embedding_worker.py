@@ -11,10 +11,8 @@ import asyncio
 import multiprocessing
 import os
 import queue
-import sys
-import time
+from contextlib import suppress
 from typing import Any
-
 
 _MODEL_NAME = os.environ.get("LOCAL_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 _DEVICE = "cpu"
@@ -55,7 +53,7 @@ class EmbeddingClient:
     def __init__(self):
         self._request_queue: multiprocessing.Queue | None = None
         self._response_queue: multiprocessing.Queue | None = None
-        self._process: multiprocessing.Process | None = None
+        self._process: Any = None
         self._counter = 0
 
     def start(self):
@@ -69,22 +67,22 @@ class EmbeddingClient:
             args=(self._request_queue, self._response_queue),
             daemon=True,
         )
+        assert self._process is not None
         self._process.start()
         # Wait for model to load
         try:
             result = self._response_queue.get(timeout=60)
             if result[0] == "error":
                 raise RuntimeError(f"Worker failed to load model: {result[1]}")
-        except queue.Empty:
-            raise RuntimeError("Embedding worker timed out during startup")
+        except queue.Empty as exc:
+            raise RuntimeError("Embedding worker timed out during startup") from exc
 
     def stop(self):
         if self._process is None:
             return
-        try:
+        assert self._request_queue is not None
+        with suppress(Exception):
             self._request_queue.put(("shutdown", None))
-        except Exception:
-            pass
         self._process.join(timeout=5)
         if self._process.is_alive():
             self._process.terminate()
@@ -95,6 +93,8 @@ class EmbeddingClient:
     def encode(self, texts: list[str]) -> list[list[float]]:
         if self._process is None or not self._process.is_alive():
             raise RuntimeError("Embedding worker is not running")
+        assert self._request_queue is not None
+        assert self._response_queue is not None
         self._counter += 1
         msg_id = f"enc_{self._counter}"
         self._request_queue.put((msg_id, texts))
@@ -103,8 +103,8 @@ class EmbeddingClient:
             if isinstance(result, str) and result.startswith("ERROR:"):
                 raise RuntimeError(result)
             return result
-        except queue.Empty:
-            raise RuntimeError("Embedding worker timed out")
+        except queue.Empty as exc:
+            raise RuntimeError("Embedding worker timed out") from exc
 
     async def aencode(self, texts: list[str]) -> list[list[float]]:
         loop = asyncio.get_event_loop()

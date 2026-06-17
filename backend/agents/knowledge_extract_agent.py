@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
+
 from agents.doc_parser_agent import DocumentChunk
 from utils.model_clients import create_chat_model
 
@@ -179,16 +180,16 @@ class KnowledgeExtractAgent:
         for result in results:
             unique_entities: list[Entity] = []
             for ent in result.entities:
-                key = f"{ent.name}::{ent.type}"
-                if key not in seen_entities:
-                    seen_entities[key] = ent
+                entity_key = f"{ent.name}::{ent.type}"
+                if entity_key not in seen_entities:
+                    seen_entities[entity_key] = ent
                     unique_entities.append(ent)
 
             unique_relations: list[Relation] = []
             for rel in result.relations:
-                key = (rel.head, rel.relation, rel.tail)
-                if key not in seen_relations:
-                    seen_relations.add(key)
+                relation_key = (rel.head, rel.relation, rel.tail)
+                if relation_key not in seen_relations:
+                    seen_relations.add(relation_key)
                     unique_relations.append(rel)
 
             deduped.append(ExtractionResult(
