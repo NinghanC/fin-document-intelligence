@@ -10,6 +10,7 @@ from agents.qa_agent import QAAgent, QueryIntent, RetrievedContext
 from services.cdc_processor import CDCProcessor
 from services.embedding_worker import _worker_process
 from services.graph_rag import GraphRAGContext, GraphRAGPipeline
+from services.ingestion_registry import ingestion_registry
 from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import _SubprocessEmbeddings
 
@@ -134,6 +135,50 @@ async def test_graphrag_entity_linking_uses_alias_and_fuzzy_match():
 
     assert await pipeline._resolve_entity("MSFT") == "Microsoft"
     assert await pipeline._resolve_entity("Microsft") == "Microsoft"
+
+
+@pytest.mark.asyncio
+async def test_entity_resolution_uses_normalized_suffix_match():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Apple Inc.", "Organization"))
+
+    pipeline = GraphRAGPipeline(VectorStore(), graph)
+
+    assert await pipeline._resolve_entity("Apple") == "Apple Inc."
+
+
+@pytest.mark.asyncio
+async def test_entity_resolution_uses_graph_alias_index():
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Apple Inc.", "Organization"))
+
+    assert (await graph.find_entity_alias("AAPL"))["name"] == "Apple Inc."
+    assert (await graph.find_entity_normalized("Apple Corp."))["name"] == "Apple Inc."
+
+
+@pytest.mark.asyncio
+async def test_entity_resolution_embedding_fallback(monkeypatch):
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    class DummyEmbeddings:
+        async def aembed_query(self, text):
+            return [1.0, 0.0]
+
+        async def aembed_documents(self, texts):
+            return [[1.0, 0.0] if text == "Duration Risk" else [0.0, 1.0] for text in texts]
+
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Duration Risk", "Concept"))
+    pipeline = GraphRAGPipeline(VectorStore(), graph)
+    pipeline.embeddings = DummyEmbeddings()
+
+    assert await pipeline._embedding_entity_match("interest rate sensitivity") == ["Duration Risk"]
 
 
 @pytest.mark.asyncio
@@ -398,3 +443,40 @@ async def test_memory_search_entities_is_case_insensitive():
     matches = await graph.search_entities("liquidity")
 
     assert matches[0]["name"] == "Global Income Fund"
+
+
+@pytest.mark.asyncio
+async def test_pending_graph_relations_are_hidden_until_commit(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.ingestion_registry.settings.upload_dir", str(tmp_path))
+    ingestion_registry._records = {}
+    source = tmp_path / "fund.txt"
+    source.write_text("Global Income Fund", encoding="utf-8")
+
+    skipped, _ = ingestion_registry.begin("doc-pending", str(source))
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Global Income Fund", "Product"), source="doc-pending#chunk-0")
+    await graph.upsert_entity(Entity("duration risk", "Concept"), source="doc-pending#chunk-0")
+    await graph.add_relation(Relation("Global Income Fund", "related_to", "duration risk"), source="doc-pending#chunk-0")
+
+    assert skipped is False
+    assert await graph.get_neighbors("Global Income Fund") == []
+
+    ingestion_registry.commit("doc-pending")
+
+    assert await graph.get_neighbors("Global Income Fund")
+
+
+@pytest.mark.asyncio
+async def test_ingestion_registry_skips_committed_same_content(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.ingestion_registry.settings.upload_dir", str(tmp_path))
+    ingestion_registry._records = {}
+    source = tmp_path / "fund.txt"
+    source.write_text("same content", encoding="utf-8")
+
+    skipped_first, _ = ingestion_registry.begin("doc-1", str(source))
+    ingestion_registry.commit("doc-1")
+    skipped_second, record = ingestion_registry.begin("doc-2", str(source))
+
+    assert skipped_first is False
+    assert skipped_second is True
+    assert record.doc_id == "doc-1"

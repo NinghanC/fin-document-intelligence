@@ -22,13 +22,12 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from difflib import SequenceMatcher
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from services.knowledge_graph import KnowledgeGraphService
-from services.vector_store import VectorStoreService
+from services.vector_store import VectorStoreService, _create_embeddings
 from utils.model_clients import create_chat_model
 
 
@@ -84,6 +83,7 @@ class GraphRAGPipeline:
         self.vector_store = vector_store
         self.knowledge_graph = knowledge_graph
         self.llm = create_chat_model()
+        self.embeddings = _create_embeddings()
         self.rerank_weights = rerank_weights or DEFAULT_RERANK_WEIGHTS
         self.alias_table = {**DEFAULT_ALIAS_TABLE, **(alias_table or {})}
 
@@ -150,25 +150,50 @@ class GraphRAGPipeline:
             return None
 
         if normalized in self.alias_table:
-            return self.alias_table[normalized]
+            alias_target = self.alias_table[normalized]
+            canonical = await self._canonicalize_alias_target(alias_target)
+            return canonical or alias_target
 
         exact = await self.knowledge_graph.get_entity(mention)
         if exact:
-            return mention
+            return self._entity_name(exact) or mention
+
+        find_alias = getattr(self.knowledge_graph, "find_entity_alias", None)
+        if callable(find_alias):
+            alias = await find_alias(mention)
+            if alias:
+                return self._entity_name(alias)
+
+        find_normalized = getattr(self.knowledge_graph, "find_entity_normalized", None)
+        if callable(find_normalized):
+            normalized_match = await find_normalized(mention)
+            if normalized_match:
+                return self._entity_name(normalized_match)
 
         candidates = await self.knowledge_graph.search_entities(mention, limit=5)
         if candidates:
             return candidates[0].get("name")
 
-        all_names = await self.knowledge_graph.get_all_entity_names()
-        best_name = None
-        best_score = 0.0
-        for name in all_names:
-            score = SequenceMatcher(None, normalized, self._normalize_entity_name(name)).ratio()
-            if score > best_score:
-                best_name = name
-                best_score = score
-        return best_name if best_score >= 0.82 else None
+        find_similar = getattr(self.knowledge_graph, "find_entities_by_name_similarity", None)
+        fuzzy_candidates = await find_similar(mention, threshold=0.82, limit=3) if callable(find_similar) else []
+        if fuzzy_candidates:
+            return fuzzy_candidates[0].get("name")
+
+        embedding_candidates = await self._embedding_entity_match(mention, threshold=0.8)
+        if embedding_candidates:
+            return embedding_candidates[0]
+        return None
+
+    async def _canonicalize_alias_target(self, alias_target: str) -> str | None:
+        exact = await self.knowledge_graph.get_entity(alias_target)
+        if exact:
+            return self._entity_name(exact) or alias_target
+        find_normalized = getattr(self.knowledge_graph, "find_entity_normalized", None)
+        if callable(find_normalized):
+            normalized = await find_normalized(alias_target)
+            if normalized:
+                return self._entity_name(normalized)
+        return None
 
     # Step 3: Subgraph retrieval
     async def _subgraph_search(self, entities: list[str], query: str = "", hops: int = 2) -> list[GraphRAGContext]:
@@ -285,6 +310,44 @@ class GraphRAGPipeline:
     @staticmethod
     def _normalize_entity_name(value: str) -> str:
         return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", value.lower())).strip()
+
+    @staticmethod
+    def _entity_name(record: dict[str, Any]) -> str | None:
+        if "name" in record:
+            return str(record["name"])
+        entity = record.get("e")
+        if isinstance(entity, dict):
+            return entity.get("name")
+        if entity is None:
+            return None
+        get_value = getattr(entity, "get", None)
+        name = get_value("name", None) if callable(get_value) else None
+        return str(name) if name else None
+
+    async def _embedding_entity_match(self, mention: str, threshold: float = 0.8, limit: int = 3) -> list[str]:
+        names = await self.knowledge_graph.get_all_entity_names()
+        if not names:
+            return []
+        mention_vector = await self.embeddings.aembed_query(mention)
+        name_vectors = await self.embeddings.aembed_documents(names)
+        scored = [
+            (self._cosine_similarity(mention_vector, vector), name)
+            for name, vector in zip(names, name_vectors, strict=False)
+        ]
+        scored = [(score, name) for score, name in scored if score >= threshold]
+        scored.sort(reverse=True)
+        return [name for _, name in scored[:limit]]
+
+    @staticmethod
+    def _cosine_similarity(left: list[float], right: list[float]) -> float:
+        if not left or not right or len(left) != len(right):
+            return 0.0
+        dot = sum(a * b for a, b in zip(left, right, strict=False))
+        left_norm = sum(a * a for a in left) ** 0.5
+        right_norm = sum(b * b for b in right) ** 0.5
+        if left_norm == 0 or right_norm == 0:
+            return 0.0
+        return dot / (left_norm * right_norm)
 
     @classmethod
     def _token_set(cls, text: str) -> set[str]:

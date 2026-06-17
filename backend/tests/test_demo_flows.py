@@ -42,6 +42,17 @@ class FakeKnowledgeGraph:
     async def get_all_entity_names(self, limit: int = 1000):
         return list(self.entities)
 
+    async def find_entity_alias(self, alias: str):
+        return None
+
+    async def find_entity_normalized(self, name: str):
+        if name.lower() == "global income fund":
+            return self.entities["Global Income Fund"]
+        return None
+
+    async def find_entities_by_name_similarity(self, mention: str, threshold: float = 0.8, limit: int = 3):
+        return []
+
     async def get_neighbors(self, entity_name: str, hops: int = 2):
         if entity_name != "Global Income Fund":
             return []

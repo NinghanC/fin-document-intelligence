@@ -19,6 +19,7 @@ from pydantic import SecretStr
 
 from agents.doc_parser_agent import DocumentChunk
 from config import settings
+from services.ingestion_registry import ingestion_registry
 from utils.model_clients import has_provider_key
 
 
@@ -248,12 +249,14 @@ class VectorStoreService:
                     max(0.0, 1.0 - float(distance)),
                 )
                 for doc, metadata, distance in zip(documents, metadatas, distances, strict=False)
+                if ingestion_registry.is_committed(str(metadata.get("doc_id", "")))
             ]
 
         results = await self._run_sync(self._store.similarity_search_with_score, query, k=top_k)
         return [
             ({"content": doc.page_content, "source": doc.metadata.get("source", ""), "metadata": doc.metadata}, score)
             for doc, score in results
+            if ingestion_registry.is_committed(str(doc.metadata.get("doc_id", "")))
         ]
 
     async def delete_by_doc_id(self, doc_id: str) -> int:

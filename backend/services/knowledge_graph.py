@@ -15,10 +15,12 @@ import hashlib
 import os
 import re
 import time
+from difflib import SequenceMatcher
 from typing import Any
 
 from agents.knowledge_extract_agent import Entity, Relation
 from config import settings
+from services.ingestion_registry import ingestion_registry
 
 WRITE_CYPHER_PATTERN = re.compile(r"\b(CREATE|MERGE|DELETE|SET|REMOVE|DROP|LOAD|CALL\s+dbms)\b", re.IGNORECASE)
 
@@ -29,6 +31,7 @@ class KnowledgeGraphService:
     def __init__(self) -> None:
         self._driver: Any = None
         self._entities: dict[str, dict[str, Any]] = {}
+        self._aliases: dict[str, str] = {}
         self._relations: list[dict[str, Any]] = []
         self._community_summaries: dict[str, dict[str, Any]] = {}
 
@@ -72,10 +75,14 @@ class KnowledgeGraphService:
             "type": entity.type,
             "description": entity.description,
             "confidence": entity.confidence,
+            "normalized_name": self.normalize_entity_name(entity.name),
+            "aliases": self._entity_aliases(entity.name),
             "version": version,
             "source": source,
             "updated_at": int(time.time()),
         }
+        for alias in self._entity_aliases(entity.name):
+            self._aliases[self.normalize_entity_name(alias)] = entity.name
         if not self._driver:
             return
         """
@@ -88,6 +95,8 @@ class KnowledgeGraphService:
             e.type = $type,
             e.description = $description,
             e.confidence = $confidence,
+            e.normalized_name = $normalized_name,
+            e.aliases = $aliases,
             e.version = $version,
             e.source = $source,
             e.created_at = $now,
@@ -103,6 +112,8 @@ class KnowledgeGraphService:
                 "type": entity.type,
             "description": entity.description,
             "confidence": entity.confidence,
+            "normalized_name": self.normalize_entity_name(entity.name),
+            "aliases": self._entity_aliases(entity.name),
             "version": version,
             "source": source,
             "now": int(time.time()),
@@ -156,10 +167,62 @@ class KnowledgeGraphService:
     async def get_entity(self, name: str) -> dict | None:
         """Query a single entity"""
         if not self._driver:
-            return self._entities.get(name)
+            entity = self._entities.get(name)
+            return entity if entity and self._source_visible(entity.get("source", "")) else None
         cypher = "MATCH (e:Entity {name: $name}) RETURN e"
         records = await self.execute_cypher(cypher, {"name": name})
         return records[0] if records else None
+
+    async def find_entity_alias(self, alias: str) -> dict | None:
+        """Resolve a known alias such as a ticker or common short name."""
+        normalized = self.normalize_entity_name(alias)
+        if not self._driver:
+            canonical = self._aliases.get(normalized)
+            return self._entities.get(canonical) if canonical else None
+        records = await self.execute_cypher(
+            """
+            MATCH (e:Entity)
+            WHERE $alias IN e.aliases
+            RETURN e.name AS name, e.type AS type, e.description AS description
+            LIMIT 1
+            """,
+            {"alias": normalized},
+        )
+        return records[0] if records else None
+
+    async def find_entity_normalized(self, name: str) -> dict | None:
+        """Resolve by normalized name, stripping common organization suffixes."""
+        normalized = self.normalize_entity_name(name)
+        if not self._driver:
+            for entity in self._entities.values():
+                if entity.get("normalized_name") == normalized:
+                    return entity
+            return None
+        records = await self.execute_cypher(
+            """
+            MATCH (e:Entity)
+            WHERE e.normalized_name = $normalized
+            RETURN e.name AS name, e.type AS type, e.description AS description
+            LIMIT 1
+            """,
+            {"normalized": normalized},
+        )
+        return records[0] if records else None
+
+    async def find_entities_by_name_similarity(self, mention: str, threshold: float = 0.8, limit: int = 3) -> list[dict]:
+        """Lightweight fallback for entity linking when vector name indexes are unavailable."""
+        normalized = self.normalize_entity_name(mention)
+        names = await self.get_all_entity_names()
+        scored: list[tuple[float, str]] = []
+        for name in names:
+            score = SequenceMatcher(None, normalized, self.normalize_entity_name(name)).ratio()
+            if score >= threshold:
+                scored.append((score, name))
+        scored.sort(reverse=True)
+        return [
+            {"name": name, "similarity": score}
+            for score, name in scored[:limit]
+        ]
 
     async def get_neighbors(self, entity_name: str, hops: int = 2) -> list[dict]:
         """
@@ -188,6 +251,7 @@ class KnowledgeGraphService:
                 entity
                 for entity in self._entities.values()
                 if lowered in entity["name"].lower() or lowered in entity.get("description", "").lower()
+                if self._source_visible(entity.get("source", ""))
             ]
             return matches[:limit]
         cypher = """
@@ -202,7 +266,10 @@ class KnowledgeGraphService:
     async def get_all_entity_names(self, limit: int = 1000) -> list[str]:
         """Return entity names for alias/fuzzy entity resolution."""
         if not self._driver:
-            return list(self._entities)[:limit]
+            return [
+                name for name, entity in self._entities.items()
+                if self._source_visible(entity.get("source", ""))
+            ][:limit]
         records = await self.execute_cypher(
             "MATCH (e:Entity) RETURN e.name AS name LIMIT $limit",
             {"limit": limit},
@@ -339,6 +406,8 @@ class KnowledgeGraphService:
         for _ in range(hops):
             next_frontier: set[str] = set()
             for rel in self._relations:
+                if not self._source_visible(rel.get("source", "")):
+                    continue
                 pairs = []
                 if rel["head"] in frontier:
                     pairs.append((rel["head"], rel["tail"]))
@@ -373,11 +442,40 @@ class KnowledgeGraphService:
         return value == exact or value.startswith(source_chunk_prefix) or value.startswith(doc_id_chunk_prefix)
 
     @staticmethod
+    def _source_visible(source: str) -> bool:
+        doc_id = source.split("#chunk-", 1)[0] if source else ""
+        return ingestion_registry.is_committed(doc_id)
+
+    @staticmethod
     def _sanitize_rel_type(raw: str) -> str:
         rel_type = raw.upper().replace(" ", "_")
         if not re.match(r"^[A-Z_]+$", rel_type):
             return "RELATED_TO"
         return rel_type
+
+    @staticmethod
+    def normalize_entity_name(name: str) -> str:
+        normalized = re.sub(r"[^a-z0-9 ]+", " ", name.lower()).strip()
+        normalized = re.sub(r"\s+", " ", normalized)
+        suffixes = (" incorporated", " inc", " corporation", " corp", " limited", " ltd", " llc", " plc", " ag", " sa")
+        for suffix in suffixes:
+            if normalized.endswith(suffix):
+                normalized = normalized[: -len(suffix)].strip()
+                break
+        return normalized
+
+    @classmethod
+    def _entity_aliases(cls, name: str) -> list[str]:
+        aliases = {cls.normalize_entity_name(name)}
+        compact = re.sub(r"[^A-Za-z0-9]", "", name).lower()
+        if compact:
+            aliases.add(compact)
+        ticker_aliases = {
+            "apple": {"aapl", "apple inc", "appleinc"},
+            "microsoft": {"msft", "microsoft corp", "microsoft corporation"},
+        }
+        aliases.update(ticker_aliases.get(cls.normalize_entity_name(name), set()))
+        return sorted(aliases)
 
     @staticmethod
     def _format_community_summary(members: list[str], relations: list[str]) -> str:

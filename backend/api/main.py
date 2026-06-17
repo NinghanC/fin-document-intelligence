@@ -75,9 +75,10 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.upload_dir, exist_ok=True)
     await _init_with_retry(vector_store.init)
     await _init_with_retry(knowledge_graph.init)
-    workflows.update(
-        build_knowledge_graph_workflow(vector_store=vector_store, knowledge_graph=knowledge_graph)
-    )
+    if not workflows:
+        workflows.update(
+            build_knowledge_graph_workflow(vector_store=vector_store, knowledge_graph=knowledge_graph)
+        )
     update_wf = workflows.get("update")
     if update_wf:
         async def _process_cdc_change(change: DocumentChange) -> Any:
