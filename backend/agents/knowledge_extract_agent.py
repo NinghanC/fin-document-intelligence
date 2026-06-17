@@ -11,6 +11,7 @@ Core capabilities:
 from __future__ import annotations
 
 import json
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -51,6 +52,7 @@ class Entity:
     name: str
     type: str
     description: str = ""
+    confidence: float = 1.0
     properties: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -138,6 +140,7 @@ class KnowledgeExtractAgent:
                 name=e.get("name", ""),
                 type=e.get("type", "Concept"),
                 description=e.get("description", ""),
+                confidence=float(e.get("confidence", 1.0)),
             )
             for e in data.get("entities", [])
             if e.get("name")
@@ -160,11 +163,32 @@ class KnowledgeExtractAgent:
             )
             for ev in data.get("events", [])
         ]
-        return ExtractionResult(
+        return self._filter_extraction_result(ExtractionResult(
             entities=entities,
             relations=relations,
             events=events,
             source_chunk_id=source_id,
+        ))
+
+    @staticmethod
+    def _filter_extraction_result(result: ExtractionResult) -> ExtractionResult:
+        """Apply lightweight quality gates before graph storage."""
+        entities = [entity for entity in result.entities if entity.confidence >= 0.7]
+        name_counts = Counter(entity.name for entity in entities)
+        entities = [
+            entity for entity in entities
+            if name_counts[entity.name] >= 2 or entity.confidence >= 0.9
+        ]
+        valid_names = {entity.name for entity in entities}
+        relations = [
+            relation for relation in result.relations
+            if relation.confidence >= 0.7 and relation.head in valid_names and relation.tail in valid_names
+        ]
+        return ExtractionResult(
+            entities=entities,
+            relations=relations,
+            events=result.events,
+            source_chunk_id=result.source_chunk_id,
         )
 
     # deduplication & entity resolution

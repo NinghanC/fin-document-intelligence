@@ -322,7 +322,12 @@ class QAAgent:
 
     @staticmethod
     def _calc_confidence(contexts: list[RetrievedContext]) -> float:
+        """Interpretable retrieval-quality signal, not a probability."""
         if not contexts:
             return 0.0
-        avg_score = sum(c.score for c in contexts) / len(contexts)
-        return min(avg_score, 1.0)
+        best_score = max(min(max(c.score, 0.0), 1.0) for c in contexts)
+        unique_sources = len({c.source for c in contexts if c.source})
+        source_diversity = min(unique_sources / 3, 1.0)
+        has_graph_support = any(c.retrieval_type == "graph" for c in contexts)
+        confidence = (best_score * 0.5) + (source_diversity * 0.3) + (0.2 if has_graph_support else 0.0)
+        return round(min(confidence, 1.0), 2)

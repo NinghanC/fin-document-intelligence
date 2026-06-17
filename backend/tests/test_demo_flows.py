@@ -28,6 +28,20 @@ class FakeVectorStore:
 
 
 class FakeKnowledgeGraph:
+    def __init__(self):
+        self.entities = {"Global Income Fund": {"name": "Global Income Fund"}}
+
+    async def get_entity(self, name: str):
+        return self.entities.get(name)
+
+    async def search_entities(self, keyword: str, limit: int = 20):
+        if keyword.lower() in "global income fund":
+            return [{"name": "Global Income Fund"}]
+        return []
+
+    async def get_all_entity_names(self, limit: int = 1000):
+        return list(self.entities)
+
     async def get_neighbors(self, entity_name: str, hops: int = 2):
         if entity_name != "Global Income Fund":
             return []
@@ -43,6 +57,17 @@ class FakeKnowledgeGraph:
 
     async def execute_cypher(self, cypher: str, params: dict | None = None):
         return []
+
+    async def get_community_summaries(self, entities: list[str], limit: int = 3):
+        if "Global Income Fund" not in entities:
+            return []
+        return [
+            {
+                "community_id": "fund-risk",
+                "members": ["Global Income Fund", "duration risk"],
+                "summary": "Global Income Fund is linked to duration risk and liquidity buffer controls.",
+            }
+        ]
 
 
 @pytest.mark.asyncio
@@ -78,7 +103,7 @@ async def test_graphrag_pipeline_returns_vector_and_graph_contexts():
     contexts = await pipeline.retrieve("Global Income Fund duration risk", top_k=5)
 
     assert contexts
-    assert {ctx.source_type for ctx in contexts} >= {"vector", "subgraph"}
+    assert {ctx.source_type for ctx in contexts} >= {"vector", "subgraph", "community"}
 
 
 @pytest.mark.asyncio

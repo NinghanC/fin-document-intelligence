@@ -126,6 +126,7 @@ def _build_ingest_graph(
                         entity_count += 1
                     for rel in ext.relations:
                         await knowledge_graph.add_relation(rel, source=ext.source_chunk_id)
+                await knowledge_graph.refresh_community_summaries()
             except Exception:
                 pass
         return {**state, "entities_stored": entity_count}

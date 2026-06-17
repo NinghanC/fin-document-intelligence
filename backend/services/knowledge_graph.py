@@ -30,6 +30,7 @@ class KnowledgeGraphService:
         self._driver: Any = None
         self._entities: dict[str, dict[str, Any]] = {}
         self._relations: list[dict[str, Any]] = []
+        self._community_summaries: dict[str, dict[str, Any]] = {}
 
     # lifecycle
     async def init(self) -> None:
@@ -70,6 +71,7 @@ class KnowledgeGraphService:
             "name": entity.name,
             "type": entity.type,
             "description": entity.description,
+            "confidence": entity.confidence,
             "version": version,
             "source": source,
             "updated_at": int(time.time()),
@@ -85,6 +87,7 @@ class KnowledgeGraphService:
         ON CREATE SET
             e.type = $type,
             e.description = $description,
+            e.confidence = $confidence,
             e.version = $version,
             e.source = $source,
             e.created_at = $now,
@@ -98,10 +101,11 @@ class KnowledgeGraphService:
             await session.run(cypher, {
                 "name": entity.name,
                 "type": entity.type,
-                "description": entity.description,
-                "version": version,
-                "source": source,
-                "now": int(time.time()),
+            "description": entity.description,
+            "confidence": entity.confidence,
+            "version": version,
+            "source": source,
+            "now": int(time.time()),
             })
 
     async def add_relation(self, relation: Relation, source: str = "") -> None:
@@ -194,6 +198,83 @@ class KnowledgeGraphService:
         """
         return await self.execute_cypher(cypher, {"keyword": keyword, "limit": limit})
 
+    async def get_all_entity_names(self, limit: int = 1000) -> list[str]:
+        """Return entity names for alias/fuzzy entity resolution."""
+        if not self._driver:
+            return list(self._entities)[:limit]
+        records = await self.execute_cypher(
+            "MATCH (e:Entity) RETURN e.name AS name LIMIT $limit",
+            {"limit": limit},
+        )
+        return [record["name"] for record in records if record.get("name")]
+
+    async def refresh_community_summaries(self) -> int:
+        """Precompute simple connected-component community summaries.
+
+        The public prototype avoids per-query LLM community summaries. Production
+        deployments can replace this with Leiden/Louvain plus richer offline
+        summarization.
+        """
+        if self._driver:
+            return await self._refresh_neo4j_community_summaries()
+
+        adjacency: dict[str, set[str]] = {name: set() for name in self._entities}
+        for relation in self._relations:
+            head = relation["head"]
+            tail = relation["tail"]
+            adjacency.setdefault(head, set()).add(tail)
+            adjacency.setdefault(tail, set()).add(head)
+
+        seen: set[str] = set()
+        summaries: dict[str, dict[str, Any]] = {}
+        for entity in adjacency:
+            if entity in seen:
+                continue
+            stack = [entity]
+            members: set[str] = set()
+            while stack:
+                current = stack.pop()
+                if current in seen:
+                    continue
+                seen.add(current)
+                members.add(current)
+                stack.extend(adjacency.get(current, set()) - seen)
+
+            community_id = hashlib.sha256("|".join(sorted(members)).encode()).hexdigest()[:12]
+            rels = [
+                f"{rel['head']} -[{rel['relation']}]-> {rel['tail']}"
+                for rel in self._relations
+                if rel["head"] in members and rel["tail"] in members
+            ]
+            summaries[community_id] = {
+                "community_id": community_id,
+                "members": sorted(members),
+                "summary": self._format_community_summary(sorted(members), rels),
+            }
+
+        self._community_summaries = summaries
+        return len(summaries)
+
+    async def get_community_summaries(self, entities: list[str], limit: int = 3) -> list[dict[str, Any]]:
+        """Return precomputed summaries that contain any linked query entity."""
+        if self._driver:
+            records = await self.execute_cypher(
+                """
+                MATCH (c:CommunitySummary)
+                WHERE any(entity IN $entities WHERE entity IN c.members)
+                RETURN c.community_id AS community_id, c.members AS members, c.summary AS summary
+                LIMIT $limit
+                """,
+                {"entities": entities, "limit": limit},
+            )
+            return records
+
+        matches = [
+            summary for summary in self._community_summaries.values()
+            if set(entities) & set(summary.get("members", []))
+        ]
+        return matches[:limit]
+
     # delete operations
     async def delete_by_source(self, source: str) -> int:
         """Delete all entities and relationships by source (delete before rebuilding during incremental updates)"""
@@ -211,6 +292,7 @@ class KnowledgeGraphService:
             and rel.get("head") not in memory_deleted
             and rel.get("tail") not in memory_deleted
         ]
+        await self.refresh_community_summaries()
         if not self._driver:
             return len(memory_deleted)
         cypher = """
@@ -295,3 +377,56 @@ class KnowledgeGraphService:
         if not re.match(r"^[A-Z_]+$", rel_type):
             return "RELATED_TO"
         return rel_type
+
+    @staticmethod
+    def _format_community_summary(members: list[str], relations: list[str]) -> str:
+        member_text = ", ".join(members[:8])
+        relation_text = "; ".join(relations[:8]) if relations else "No direct relationships captured."
+        return f"Community containing {member_text}. Relationships: {relation_text}"
+
+    async def _refresh_neo4j_community_summaries(self) -> int:
+        """Small connected-component approximation for Neo4j deployments without GDS."""
+        records = await self.execute_cypher(
+            """
+            MATCH (a:Entity)
+            OPTIONAL MATCH (a)-[r]-(b:Entity)
+            RETURN a.name AS entity, collect(DISTINCT b.name) AS neighbors
+            """,
+        )
+        adjacency: dict[str, set[str]] = {
+            record["entity"]: {neighbor for neighbor in record.get("neighbors", []) if neighbor}
+            for record in records
+            if record.get("entity")
+        }
+        seen: set[str] = set()
+        summaries: list[dict[str, Any]] = []
+        for entity in adjacency:
+            if entity in seen:
+                continue
+            stack = [entity]
+            members: set[str] = set()
+            while stack:
+                current = stack.pop()
+                if current in seen:
+                    continue
+                seen.add(current)
+                members.add(current)
+                stack.extend(adjacency.get(current, set()) - seen)
+            community_id = hashlib.sha256("|".join(sorted(members)).encode()).hexdigest()[:12]
+            summaries.append({
+                "community_id": community_id,
+                "members": sorted(members),
+                "summary": self._format_community_summary(sorted(members), []),
+            })
+
+        await self.execute_cypher("MATCH (c:CommunitySummary) DETACH DELETE c", read_only=False)
+        for summary in summaries:
+            await self.execute_cypher(
+                """
+                MERGE (c:CommunitySummary {community_id: $community_id})
+                SET c.members = $members, c.summary = $summary
+                """,
+                summary,
+                read_only=False,
+            )
+        return len(summaries)

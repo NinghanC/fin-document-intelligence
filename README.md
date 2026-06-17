@@ -363,18 +363,21 @@ The intent classifier supports:
 - `procedural`
 - `exploratory`
 
-Hybrid reranking gives graph results a higher weight because graph records encode structured relationships:
+Hybrid retrieval merges vector, subgraph, path, and cached community-summary contexts. The public prototype uses neutral default weights so it does not pretend hand-picked multipliers are learned relevance scores:
 
 ```text
 vector = 1.0
-graph = 1.2
-hybrid = 1.1
+subgraph = 1.0
+path = 1.0
+community = 1.0
 ```
+
+Non-uniform GraphRAG weights should be tuned with a labeled retrieval set. The `bench/` directory includes a small evaluation scaffold for expected-source checks and future recall@k tuning.
 
 The response includes:
 
 - answer
-- confidence
+- retrieval-quality confidence signal
 - intent
 - source snippets
 - reasoning steps

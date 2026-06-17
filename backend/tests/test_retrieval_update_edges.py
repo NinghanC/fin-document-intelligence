@@ -5,6 +5,7 @@ from agents.knowledge_extract_agent import Entity, Relation
 from agents.knowledge_update_agent import ChangeType, DocumentChange, KnowledgeUpdateAgent
 from agents.qa_agent import QAAgent, RetrievedContext
 from services.cdc_processor import CDCProcessor
+from services.graph_rag import GraphRAGContext, GraphRAGPipeline
 from services.knowledge_graph import KnowledgeGraphService
 
 
@@ -113,3 +114,70 @@ async def test_read_only_cypher_allows_match_without_driver():
     result = await graph.execute_cypher("MATCH (n) RETURN n LIMIT 1")
 
     assert result == []
+
+
+@pytest.mark.asyncio
+async def test_graphrag_entity_linking_uses_alias_and_fuzzy_match():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Microsoft", "Organization"))
+
+    pipeline = GraphRAGPipeline(VectorStore(), graph)
+
+    assert await pipeline._resolve_entity("MSFT") == "Microsoft"
+    assert await pipeline._resolve_entity("Microsft") == "Microsoft"
+
+
+@pytest.mark.asyncio
+async def test_community_summaries_are_precomputed_and_retrieved():
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Global Income Fund", "Product"))
+    await graph.upsert_entity(Entity("duration risk", "Concept"))
+    await graph.add_relation(Relation("Global Income Fund", "related_to", "duration risk"))
+    count = await graph.refresh_community_summaries()
+
+    summaries = await graph.get_community_summaries(["Global Income Fund"])
+
+    assert count == 1
+    assert summaries
+    assert "Global Income Fund" in summaries[0]["summary"]
+
+
+def test_graphrag_deduplicates_by_normalized_terms_not_prefix():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    pipeline = GraphRAGPipeline(VectorStore(), KnowledgeGraphService())
+    contexts = [
+        GraphRAGContext("Apple reported revenue for 2023 in the filing", "vector", 0.9),
+        GraphRAGContext("In the filing, revenue was reported by Apple for 2023", "subgraph", 0.8),
+        GraphRAGContext("Apple reported revenue for 2024 in the filing", "vector", 0.7),
+    ]
+
+    reranked = pipeline._cross_rerank(contexts, "Apple revenue")
+
+    assert len(reranked) == 2
+
+
+def test_graphrag_custom_weights_are_explicit_configuration():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    pipeline = GraphRAGPipeline(
+        VectorStore(),
+        KnowledgeGraphService(),
+        rerank_weights={"vector": 1.0, "subgraph": 2.0, "path": 1.0, "community": 1.0},
+    )
+    contexts = [
+        GraphRAGContext("vector context", "vector", 0.9),
+        GraphRAGContext("graph context", "subgraph", 0.6),
+    ]
+
+    reranked = pipeline._cross_rerank(contexts, "fund risk")
+
+    assert reranked[0].source_type == "subgraph"
