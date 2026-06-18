@@ -8,6 +8,7 @@ errors do not crash the main API server.
 from __future__ import annotations
 
 import asyncio
+import logging
 import multiprocessing
 import os
 import queue
@@ -17,6 +18,7 @@ from typing import Any
 _MODEL_NAME = os.environ.get("LOCAL_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 _DEVICE = "cpu"
 _SHUTDOWN_TIMEOUT = 30
+logger = logging.getLogger("finsight.embedding_worker")
 
 
 def _worker_process(request_queue: multiprocessing.Queue, response_queue: multiprocessing.Queue):
@@ -134,5 +136,6 @@ def get_embedding_client() -> EmbeddingClient | None:
         try:
             _embedding_client.start()
         except Exception:
+            logger.warning("embedding_worker_start_failed", exc_info=True)
             _embedding_client = None
     return _embedding_client

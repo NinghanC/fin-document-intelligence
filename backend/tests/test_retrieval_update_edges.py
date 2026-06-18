@@ -6,7 +6,8 @@ import pytest
 from agents.doc_parser_agent import DocParserAgent, DocType, DocumentChunk
 from agents.knowledge_extract_agent import Entity, ExtractionResult, KnowledgeExtractAgent, Relation
 from agents.knowledge_update_agent import ChangeType, DocumentChange, KnowledgeUpdateAgent
-from agents.qa_agent import QAAgent, QueryIntent, RetrievedContext
+from agents.qa_agent import QAAgent, QAResult, QueryIntent, RetrievedContext
+from orchestrator.graph import _build_qa_graph
 from services.cdc_processor import CDCProcessor
 from services.embedding_worker import _worker_process
 from services.graph_rag import GraphRAGContext, GraphRAGPipeline
@@ -43,6 +44,34 @@ def test_multimodal_weights_keep_unknown_doc_type_neutral():
 
     assert reranked[0].source == "unknown.bin"
     assert reranked[1].score == pytest.approx(0.85)
+
+
+@pytest.mark.asyncio
+async def test_qa_graph_retries_then_clarifies_low_quality_answer():
+    class Agent:
+        def __init__(self):
+            self.calls = 0
+
+        async def answer(self, question):
+            self.calls += 1
+            return QAResult(
+                question=question,
+                answer="insufficient",
+                contexts=[],
+                intent=QueryIntent.FACTOID,
+                retrieval_quality=0.1,
+                reasoning_steps=[f"attempt {self.calls}"],
+            )
+
+    agent = Agent()
+    workflow = _build_qa_graph(agent)
+
+    result = await workflow.ainvoke({"question": "What is the LCR?"})
+
+    assert agent.calls == 2
+    assert result["needs_clarification"] is True
+    assert result["result"].retrieval_quality == 0.0
+    assert "not have enough retrieved evidence" in result["result"].answer
 
 
 def test_balanced_contexts_keep_vector_and_graph_sources():

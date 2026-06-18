@@ -104,7 +104,7 @@ Liquidity coverage ratio was 113% for JPMorgan Chase in 2023.
         f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did JPMorgan Chase report for 2023?"
     )
 
-    assert "Liquidity coverage ratio was 113%" in answer
+    assert "JPMorgan Chase reported an average liquidity coverage ratio of 113% for 2023." in answer
 
 
 def test_demo_model_answer_focuses_long_table_excerpt_on_query_terms():
@@ -116,8 +116,19 @@ Selected ratios and metrics Return on common equity 17 % Return on tangible comm
         f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did JPMorgan Chase report for 2023?"
     )
 
-    assert "Liquidity coverage ratio" in answer
-    assert "113" in answer
+    assert "JPMorgan Chase reported an average liquidity coverage ratio of 113% for 2023." in answer
+
+
+def test_demo_model_says_insufficient_when_metric_context_is_truncated():
+    context = """\
+[Source 1: jpmorgan.pdf | Type: vector | Score: 0.95]
+Selected ratios and metrics Return on common equity 17 % Return on assets 1.30 Overhead ratio 55 59 59 Lo.
+"""
+    answer = DemoChatModel._answer(
+        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did JPMorgan Chase report for 2023?"
+    )
+
+    assert "insufficient" in answer.lower()
 
 
 def test_demo_model_answer_prefers_revenue_window_over_generic_risk_line():
@@ -131,7 +142,61 @@ Revenue increased $13.6 billion or 7% driven by growth in Intelligent Cloud and 
         f"Context information:\n{context}\n\nUser question: What did Microsoft identify as major revenue sources in fiscal 2023?"
     )
 
-    assert "Revenue increased $13.6 billion" in answer
+    assert "Microsoft reported that fiscal 2023 revenue increased $13.6 billion" in answer
+    assert "Intelligent Cloud and Productivity and Business Processes" in answer
+
+
+def test_demo_model_formats_microsoft_segment_revenue_table():
+    context = """\
+[Source 1: microsoft.pdf | Type: vector | Score: 0.95]
+Revenue
+Productivity and Business Processes  $ 69,274   $ 63,364   $ 53,915
+Intelligent Cloud   87,907    74,965    59,728
+More Personal Computing   54,734    59,941    54,445
+Total  $ 211,915   $ 198,270   $ 168,088
+"""
+    answer = DemoChatModel._answer(
+        f"Context information:\n{context}\n\nUser question: What were Microsoft's reported revenue segments in fiscal 2023?"
+    )
+
+    assert "Productivity and Business Processes $69,274 million" in answer
+    assert "Intelligent Cloud $87,907 million" in answer
+    assert "More Personal Computing $54,734 million" in answer
+
+
+def test_demo_model_formats_apple_deferred_revenue_answer():
+    context = """\
+[Source 1: apple.pdf | Type: vector | Score: 0.95]
+Total net sales include $8.2 billion of revenue recognized in 2023 that was included in deferred revenue as of September 24, 2022.
+"""
+    answer = DemoChatModel._answer(
+        "Context information:\n"
+        f"{context}\n\n"
+        "User question: How much revenue did Apple recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
+    )
+
+    assert "Apple recognized $8.2 billion of revenue in 2023" in answer
+
+
+def test_demo_model_prefers_apple_deferred_revenue_over_distractors():
+    context = """\
+[Source 1: microsoft.pdf | Type: vector | Score: 1.00]
+Our Microsoft Cloud revenue was $111.6 billion in fiscal year 2023.
+
+[Source 2: apple.pdf | Type: vector | Score: 0.95]
+Total net sales include $8.2 billion of revenue recognized in 2023 that was included in deferred revenue as of September 24, 2022, $7.5 billion of revenue recognized in 2022.
+"""
+    answer = DemoChatModel._answer(
+        "Context information:\n"
+        f"{context}\n\n"
+        "User question: How much revenue did Apple recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
+    )
+
+    assert "Apple recognized $8.2 billion of revenue in 2023" in answer
+
+
+def test_demo_model_classifies_how_much_as_factoid():
+    assert DemoChatModel._classify_intent("How much revenue did Apple recognize?") == "factoid"
 
 
 @pytest.mark.asyncio

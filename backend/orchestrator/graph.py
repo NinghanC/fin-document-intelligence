@@ -15,6 +15,7 @@ import asyncio
 from enum import Enum
 from typing import Annotated, Any
 
+import structlog
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
@@ -25,10 +26,12 @@ from agents.knowledge_update_agent import (
     KnowledgeUpdateAgent,
     UpdateResult,
 )
-from agents.qa_agent import QAAgent, QAResult
+from agents.qa_agent import QAAgent, QAResult, QueryIntent
 from services.ingestion_registry import ingestion_registry
 from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import VectorStoreService
+
+logger = structlog.get_logger("finsight.orchestrator")
 
 
 class WorkflowType(str, Enum):
@@ -154,7 +157,8 @@ def _build_ingest_graph(
                 "skipped": False,
                 "content_hash": record.content_hash,
             }
-        except Exception:
+        except Exception as exc:
+            logger.warning("ingest_store_failed_rolling_back", doc_id=doc_id, source=source, error=str(exc))
             ingestion_registry.fail(doc_id)
             if vector_store and hasattr(vector_store, "delete_by_doc_id"):
                 await vector_store.delete_by_doc_id(doc_id)
@@ -181,12 +185,56 @@ def _build_qa_graph(qa_agent: QAAgent) -> Any:
     async def process_question(state: dict) -> dict:
         question = state.get("question", "")
         result = await qa_agent.answer(question)
-        return {**state, "result": result}
+        return {**state, "result": result, "qa_attempts": int(state.get("qa_attempts", 0)) + 1}
+
+    async def retry_with_evidence_focus(state: dict) -> dict:
+        question = state.get("question", "")
+        focused_question = (
+            f"{question}\n\nRetrieve exact source-backed evidence and answer only if the retrieved context is sufficient."
+        )
+        result = await qa_agent.answer(focused_question)
+        return {
+            **state,
+            "result": result,
+            "qa_attempts": int(state.get("qa_attempts", 0)) + 1,
+            "retried_for_low_quality": True,
+        }
+
+    async def ask_for_clarification(state: dict) -> dict:
+        previous = state.get("result")
+        reasoning_steps = []
+        intent = QueryIntent.FACTOID
+        if isinstance(previous, QAResult):
+            reasoning_steps = [*previous.reasoning_steps]
+            intent = previous.intent
+        reasoning_steps.append("Retrieval quality remained below threshold after retry")
+        result = QAResult(
+            question=state.get("question", ""),
+            answer="I do not have enough retrieved evidence to answer this reliably. Please narrow the question or ingest a more relevant source document.",
+            contexts=[],
+            intent=intent,
+            retrieval_quality=0.0,
+            reasoning_steps=reasoning_steps,
+        )
+        return {**state, "result": result, "needs_clarification": True}
+
+    def route_after_answer(state: dict) -> str:
+        result = state.get("result")
+        attempts = int(state.get("qa_attempts", 0))
+        if isinstance(result, QAResult) and result.retrieval_quality < 0.25 and attempts < 2:
+            return "retry"
+        if isinstance(result, QAResult) and result.retrieval_quality < 0.25:
+            return "clarify"
+        return "done"
 
     graph = StateGraph(dict)  # type: ignore[type-var]
     graph.add_node("answer", process_question)  # type: ignore[type-var]
+    graph.add_node("retry", retry_with_evidence_focus)  # type: ignore[type-var]
+    graph.add_node("clarify", ask_for_clarification)  # type: ignore[type-var]
     graph.set_entry_point("answer")
-    graph.add_edge("answer", END)
+    graph.add_conditional_edges("answer", route_after_answer, {"retry": "retry", "clarify": "clarify", "done": END})
+    graph.add_conditional_edges("retry", route_after_answer, {"retry": "retry", "clarify": "clarify", "done": END})
+    graph.add_edge("clarify", END)
 
     return graph.compile()
 

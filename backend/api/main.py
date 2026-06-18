@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -28,6 +29,7 @@ from pydantic import BaseModel, Field
 from agents.knowledge_update_agent import ChangeType, DocumentChange
 from config import settings
 from orchestrator.graph import build_knowledge_graph_workflow
+from services.api_state import APIStateStore
 from services.cdc_processor import CDCEvent, CDCProcessor
 from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import VectorStoreService
@@ -43,6 +45,12 @@ _request_metrics: dict[str, Any] = {
     "total_latency_ms": 0.0,
     "by_path": {},
 }
+api_state_store = APIStateStore(
+    backend=settings.api_state_backend,
+    dsn=settings.api_state_dsn,
+    rate_limit_buckets=_rate_limit_buckets,
+    request_metrics=_request_metrics,
+)
 
 structlog.configure(
     processors=[
@@ -63,7 +71,8 @@ async def _init_with_retry(init_fn: Callable[[], Awaitable[None]], attempts: int
         try:
             await init_fn()
             return True
-        except Exception:
+        except Exception as exc:
+            logger.warning("service_init_retry_failed", attempt=attempt, error=str(exc))
             if attempt == attempts:
                 return False
             await asyncio.sleep(delay)
@@ -73,6 +82,7 @@ async def _init_with_retry(init_fn: Callable[[], Awaitable[None]], attempts: int
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(settings.upload_dir, exist_ok=True)
+    await api_state_store.init()
     await _init_with_retry(vector_store.init)
     await _init_with_retry(knowledge_graph.init)
     if not workflows:
@@ -127,7 +137,7 @@ async def request_context_middleware(request: Request, call_next):
 
     duration_ms = (time.perf_counter() - start) * 1000
     response.headers["X-Request-ID"] = request_id
-    _record_request_metric(request.url.path, duration_ms)
+    await api_state_store.record_request_metric(request.url.path, duration_ms)
     logger.info("request_completed", status_code=response.status_code, duration_ms=round(duration_ms, 2))
     return response
 
@@ -138,13 +148,13 @@ async def rate_limit_middleware(request: Request, call_next):
         return await call_next(request)
 
     client = request.client.host if request.client else "unknown"
-    now = time.time()
-    window_start = now - settings.rate_limit_window_seconds
-    bucket = [ts for ts in _rate_limit_buckets.get(client, []) if ts >= window_start]
-    if len(bucket) >= settings.rate_limit_requests:
+    allowed = await api_state_store.allow_request(
+        client,
+        settings.rate_limit_requests,
+        settings.rate_limit_window_seconds,
+    )
+    if not allowed:
         return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
-    bucket.append(now)
-    _rate_limit_buckets[client] = bucket
     return await call_next(request)
 
 
@@ -156,30 +166,34 @@ async def require_api_key(x_api_key: str | None = Header(default=None, alias="X-
 
 
 def _record_request_metric(path: str, duration_ms: float) -> None:
-    _request_metrics["total_requests"] += 1
-    _request_metrics["total_latency_ms"] += duration_ms
-    by_path = _request_metrics["by_path"]
-    path_stats = by_path.setdefault(path, {"count": 0, "total_latency_ms": 0.0, "last_latency_ms": 0.0})
-    path_stats["count"] += 1
-    path_stats["total_latency_ms"] += duration_ms
-    path_stats["last_latency_ms"] = round(duration_ms, 2)
+    api_state_store._record_request_metric_memory(path, duration_ms)
 
 
 def _request_stats() -> dict[str, Any]:
-    total = _request_metrics["total_requests"]
-    by_path = {
-        path: {
-            "count": stats["count"],
-            "avg_latency_ms": round(stats["total_latency_ms"] / max(stats["count"], 1), 2),
-            "last_latency_ms": stats["last_latency_ms"],
-        }
-        for path, stats in _request_metrics["by_path"].items()
+    return api_state_store._request_stats_memory()
+
+
+def _source_excerpt(content: str, question: str, max_chars: int = 360) -> str:
+    """Return a source preview centered on question-specific terms."""
+    if len(content) <= max_chars:
+        return content
+    tokens = {
+        token
+        for token in re.findall(r"[a-zA-Z0-9]+", question.lower())
+        if len(token) >= 3 and token not in {"and", "did", "for", "the", "their", "what", "which"}
     }
-    return {
-        "total_requests": total,
-        "avg_latency_ms": round(_request_metrics["total_latency_ms"] / max(total, 1), 2),
-        "by_path": by_path,
-    }
+    broad_tokens = {"2021", "2022", "2023", "annual", "chase", "fiscal", "jpmorgan", "microsoft", "report", "year"}
+    generic_tokens = {"major", "ratio", "source", "sources"}
+    focused_tokens = (tokens - broad_tokens - generic_tokens) or (tokens - broad_tokens) or tokens
+    lowered = content.lower()
+    positions = [lowered.find(token) for token in focused_tokens if lowered.find(token) >= 0]
+    if not positions:
+        return content[:max_chars]
+    start = max(min(positions) - 80, 0)
+    end = min(start + max_chars, len(content))
+    prefix = "..." if start > 0 else ""
+    suffix = "..." if end < len(content) else ""
+    return f"{prefix}{content[start:end].strip()}{suffix}"
 
 
 # Static Files & Frontend
@@ -319,12 +333,14 @@ async def upload_document(file: UploadFile = File(...)):
 
 @app.post("/api/ingest/batch", response_model=list[IngestResponse], tags=["Document Ingestion"], dependencies=[Depends(require_api_key)])
 async def upload_batch(files: list[UploadFile] = File(...)):
-    """Upload documents in a batch"""
-    results = []
-    for file in files:
-        resp = await upload_document(file)
-        results.append(resp)
-    return results
+    """Upload documents in a bounded-concurrency batch."""
+    semaphore = asyncio.Semaphore(max(settings.batch_upload_concurrency, 1))
+
+    async def _upload_one(file: UploadFile) -> IngestResponse:
+        async with semaphore:
+            return await upload_document(file)
+
+    return await asyncio.gather(*(_upload_one(file) for file in files))
 
 
 # QA Endpoints
@@ -346,7 +362,12 @@ async def ask_question(req: QuestionRequest):
         retrieval_quality=qa_result.retrieval_quality,
         intent=qa_result.intent.value,
         sources=[
-            {"content": c.content[:200], "source": c.source, "score": c.score, "type": c.retrieval_type}
+            {
+                "content": _source_excerpt(c.content, req.question),
+                "source": c.source,
+                "score": c.score,
+                "type": c.retrieval_type,
+            }
             for c in qa_result.contexts
         ],
         reasoning_steps=qa_result.reasoning_steps,
@@ -359,17 +380,19 @@ async def get_stats():
     """Get system statistics"""
     try:
         vs_stats = await vector_store.get_stats()
-    except Exception:
+    except Exception as exc:
+        logger.warning("vector_store_stats_failed", error=str(exc))
         vs_stats = {"backend": "chroma", "total_vectors": 0}
     try:
         kg_stats = await knowledge_graph.get_stats()
-    except Exception:
+    except Exception as exc:
+        logger.warning("knowledge_graph_stats_failed", error=str(exc))
         kg_stats = {"total_entities": 0, "total_relations": 0}
     return StatsResponse(
         vector_store=vs_stats,
         knowledge_graph=kg_stats,
         cdc=cdc_processor.get_stats(),
-        api=_request_stats(),
+        api=await api_state_store.get_request_stats(),
     )
 
 
@@ -433,11 +456,13 @@ async def health():
     try:
         services["vector_store"] = await vector_store.get_stats()
     except Exception as exc:
+        logger.warning("health_vector_store_failed", error=str(exc))
         services["vector_store"] = {"status": "error", "error": str(exc)}
         status = "degraded"
     try:
         services["knowledge_graph"] = await knowledge_graph.get_stats()
     except Exception as exc:
+        logger.warning("health_knowledge_graph_failed", error=str(exc))
         services["knowledge_graph"] = {"status": "error", "error": str(exc)}
         status = "degraded"
     services["cdc"] = cdc_processor.get_stats()

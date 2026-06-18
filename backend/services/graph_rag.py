@@ -24,11 +24,14 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, TypeGuard
 
+import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import VectorStoreService, _create_embeddings
 from utils.model_clients import create_chat_model
+
+logger = structlog.get_logger("finsight.graphrag")
 
 
 @dataclass
@@ -289,7 +292,13 @@ class GraphRAGPipeline:
                             score=self._path_score(entities[i], entities[j], nodes, rels),
                             metadata={"from": entities[i], "to": entities[j], "score_method": "entity_coverage_path_length"},
                         ))
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "path_search_failed",
+                        source=entities[i],
+                        target=entities[j],
+                        error=str(exc),
+                    )
                     continue
         return contexts
 

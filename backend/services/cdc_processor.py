@@ -26,7 +26,11 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Any
 
+import structlog
+
 from config import settings
+
+logger = structlog.get_logger("finsight.cdc")
 
 
 @dataclass
@@ -182,9 +186,10 @@ class CDCProcessor:
                 result.version = self._commit_version(event.resource_path)
 
             self._event_log.append(event)
-        except Exception as e:
+        except Exception as exc:
+            logger.warning("cdc_event_processing_failed", event_id=event.event_id, error=str(exc))
             result.success = False
-            result.error = str(e)
+            result.error = str(exc)
             self._event_log.append(event)
         finally:
             if event in self._processing_queue:

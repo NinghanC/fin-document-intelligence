@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
     max_upload_size_mb: int = 10
+    batch_upload_concurrency: int = 4
+    api_state_backend: str = "memory"  # memory | postgres
+    api_state_dsn: str = "postgresql://postgres:postgres@localhost:5432/knowledge"
 
     # Document Store
     upload_dir: str = "./uploads"

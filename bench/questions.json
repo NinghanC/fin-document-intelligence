@@ -1,27 +1,26 @@
 [
   {
-    "question": "Which fund mentions liquidity constraints?",
-    "expected_source": "Q4_global_income_fund_risk_report.pdf",
-    "expected_terms": ["Global Income Fund", "liquidity"]
+    "question": "What liquidity coverage ratio did JPMorgan Chase report for 2023?",
+    "expected_source": "jpmorgan_2023_annual_report.pdf",
+    "expected_terms": ["liquidity coverage ratio", "113"],
+    "expected_answer_terms": ["113%"]
   },
   {
-    "question": "What risk factors are associated with the bond sleeve?",
-    "expected_source": "Q4_global_income_fund_risk_report.pdf",
-    "expected_terms": ["bond sleeve", "risk"]
+    "question": "What did Microsoft identify as major revenue sources in fiscal 2023?",
+    "expected_source": "microsoft_2023_10k.pdf",
+    "expected_terms": ["Revenue increased", "Intelligent Cloud", "Productivity and Business Processes"],
+    "expected_answer_terms": ["$13.6 billion", "Intelligent Cloud", "Productivity and Business Processes"]
   },
   {
-    "question": "Which documents mention redemption gates?",
-    "expected_source": "Q4_global_income_fund_risk_report.pdf",
-    "expected_terms": ["redemption gate"]
+    "question": "What were Microsoft's reported revenue segments in fiscal 2023?",
+    "expected_source": "microsoft_2023_10k.pdf",
+    "expected_terms": ["Productivity and Business Processes", "Intelligent Cloud", "More Personal Computing"],
+    "expected_answer_terms": ["Productivity and Business Processes", "Intelligent Cloud", "More Personal Computing"]
   },
   {
-    "question": "How does the policy describe credit spread exposure?",
-    "expected_source": "fund_policy_notes.md",
-    "expected_terms": ["credit spread"]
-  },
-  {
-    "question": "What source supports the liquidity answer?",
-    "expected_source": "Q4_global_income_fund_risk_report.pdf",
-    "expected_terms": ["Source"]
+    "question": "How much revenue did Apple recognize in 2023 that was included in deferred revenue as of September 24, 2022?",
+    "expected_source": "apple_2023_10k.pdf",
+    "expected_terms": ["$8.2 billion", "deferred revenue"],
+    "expected_answer_terms": ["$8.2 billion", "deferred revenue"]
   }
 ]

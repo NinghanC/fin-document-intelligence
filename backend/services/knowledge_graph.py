@@ -18,11 +18,15 @@ import time
 from difflib import SequenceMatcher
 from typing import Any
 
+import structlog
+
 from agents.knowledge_extract_agent import Entity, Relation
 from config import settings
 from services.ingestion_registry import ingestion_registry
 
 WRITE_CYPHER_PATTERN = re.compile(r"\b(CREATE|MERGE|DELETE|SET|REMOVE|DROP|LOAD|CALL\s+dbms)\b", re.IGNORECASE)
+
+logger = structlog.get_logger("finsight.knowledge_graph")
 
 
 class KnowledgeGraphService:
@@ -44,7 +48,8 @@ class KnowledgeGraphService:
         )
         try:
             await self._ensure_indexes()
-        except Exception:
+        except Exception as exc:
+            logger.warning("neo4j_index_setup_failed_using_memory_fallback", error=str(exc))
             await self._driver.close()
             self._driver = None
             raise
@@ -506,7 +511,8 @@ class KnowledgeGraphService:
                 return [], "louvain"
             communities = [set(community) for community in louvain_communities(graph, resolution=1.0, seed=42)]
             return communities, "louvain"
-        except Exception:
+        except Exception as exc:
+            logger.warning("community_detection_failed_using_connected_components", error=str(exc))
             return self._connected_components(entity_names, relations), "connected_components"
 
     @staticmethod

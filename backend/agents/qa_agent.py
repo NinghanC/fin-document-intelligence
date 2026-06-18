@@ -16,11 +16,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from services.graph_rag import GraphRAGPipeline
 from services.multimodal import MultimodalService
 from utils.model_clients import create_chat_model
+
+logger = structlog.get_logger("finsight.qa")
 
 
 class QueryIntent(str, Enum):
@@ -187,7 +190,8 @@ class QAAgent:
                     for ctx in graph_rag_contexts
                 ]
                 return self._apply_multimodal_weights(contexts)
-            except Exception:
+            except Exception as exc:
+                logger.warning("graphrag_retrieve_failed_using_fallback", error=str(exc))
                 pass
 
         vector_contexts = await self._vector_retrieve(rewritten, top_k=top_k)
@@ -347,7 +351,8 @@ class QAAgent:
                         retrieval_type="graph",
                         metadata={"cypher": cypher, "score_method": "lexical_record_overlap"},
                     ))
-            except Exception:
+            except Exception as exc:
+                logger.warning("graph_cypher_query_failed", cypher=cypher, error=str(exc))
                 continue
         return contexts
 

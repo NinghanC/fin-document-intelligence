@@ -5,6 +5,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.testclient import TestClient
 
 import api.main as api_main
+from services.api_state import APIStateStore
 
 
 def make_upload(name: str, content: bytes) -> UploadFile:
@@ -101,6 +102,24 @@ def test_request_metric_recorder_tracks_average_latency():
     assert stats["by_path"]["/api/qa/ask"]["avg_latency_ms"] == 20.0
 
 
+def test_source_excerpt_centers_on_financial_metric_terms():
+    content = (
+        "Selected ratios and metrics Return on common equity 17 % Return on tangible common equity 21 % "
+        "Return on assets 1.30 Overhead ratio 55 Loans-to-deposits ratio 55 Firm "
+        "Liquidity coverage ratio (average) 113 112 111 JPMorgan Chase Bank liquidity coverage ratio 148."
+    )
+
+    excerpt = api_main._source_excerpt(
+        content,
+        "What liquidity coverage ratio did JPMorgan Chase report for 2023?",
+        max_chars=120,
+    )
+
+    assert "Liquidity coverage ratio" in excerpt
+    assert "113" in excerpt
+    assert excerpt.startswith("...")
+
+
 def test_health_response_includes_request_id_header(monkeypatch):
     async def skip_init(init_fn, attempts=10, delay=2.0):
         return True
@@ -127,6 +146,27 @@ def test_rate_limit_returns_429(monkeypatch):
 
     assert first.status_code == 200
     assert second.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_api_state_store_memory_tracks_rate_limits_and_metrics():
+    buckets: dict[str, list[float]] = {}
+    metrics = {"total_requests": 0, "total_latency_ms": 0.0, "by_path": {}}
+    store = APIStateStore(
+        backend="memory",
+        dsn="",
+        rate_limit_buckets=buckets,
+        request_metrics=metrics,
+    )
+
+    assert await store.allow_request("client", limit=1, window_seconds=60) is True
+    assert await store.allow_request("client", limit=1, window_seconds=60) is False
+
+    await store.record_request_metric("/api/qa/ask", 25.0)
+    stats = await store.get_request_stats()
+
+    assert stats["total_requests"] == 1
+    assert stats["by_path"]["/api/qa/ask"]["avg_latency_ms"] == 25.0
 
 
 def test_admin_stats_includes_api_metrics(monkeypatch):

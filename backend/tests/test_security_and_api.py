@@ -1,3 +1,4 @@
+import asyncio
 import io
 import time
 
@@ -187,3 +188,38 @@ def test_upload_endpoint_returns_ingest_response(tmp_path, monkeypatch):
     assert body["chunks_count"] == 1
     assert body["entities_count"] == 1
     assert (tmp_path / "fund.txt").exists()
+
+
+@pytest.mark.asyncio
+async def test_upload_batch_uses_bounded_concurrency(monkeypatch):
+    calls = 0
+    max_active = 0
+    active = 0
+
+    async def fake_upload(file):
+        nonlocal calls, max_active, active
+        calls += 1
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.05)
+        active -= 1
+        return api_main.IngestResponse(
+            file_name=file.filename,
+            chunks_count=1,
+            entities_count=0,
+            relations_count=0,
+            status="success",
+        )
+
+    monkeypatch.setattr(api_main.settings, "batch_upload_concurrency", 2)
+    monkeypatch.setattr(api_main, "upload_document", fake_upload)
+
+    files = [make_upload(f"fund-{idx}.txt", b"Global Income Fund") for idx in range(4)]
+    start = time.perf_counter()
+    results = await api_main.upload_batch(files)
+    elapsed = time.perf_counter() - start
+
+    assert calls == 4
+    assert len(results) == 4
+    assert max_active == 2
+    assert elapsed < 0.16

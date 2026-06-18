@@ -383,6 +383,15 @@ python bench/run_graphrag_eval.py --mode weighted-grid
 python bench/run_graphrag_eval.py --mode both
 ```
 
+The default public-demo questions use only publicly available annual reports and 10-K filings:
+
+| Question | Expected source | Expected evidence |
+| --- | --- | --- |
+| What liquidity coverage ratio did JPMorgan Chase report for 2023? | `jpmorgan_2023_annual_report.pdf` | `Liquidity coverage ratio ... 113` |
+| What did Microsoft identify as major revenue sources in fiscal 2023? | `microsoft_2023_10k.pdf` | `Revenue increased`, `Intelligent Cloud`, `Productivity and Business Processes` |
+| What were Microsoft's reported revenue segments in fiscal 2023? | `microsoft_2023_10k.pdf` | `Productivity and Business Processes`, `Intelligent Cloud`, `More Personal Computing` |
+| How much revenue did Apple recognize in 2023 that was included in deferred revenue as of September 24, 2022? | `apple_2023_10k.pdf` | `$8.2 billion`, `deferred revenue` |
+
 The response includes:
 
 - answer
@@ -390,6 +399,13 @@ The response includes:
 - intent
 - source snippets
 - reasoning steps
+
+Operational hardening in the public prototype:
+
+- Batch uploads are processed with bounded concurrency (`BATCH_UPLOAD_CONCURRENCY`) instead of a sequential loop.
+- Retrieval, parsing, graph, and storage fallbacks emit structured warning logs instead of silently swallowing exceptions.
+- Rate-limit buckets and request metrics default to in-memory state for local demos, with an optional PostgreSQL-backed mode via `API_STATE_BACKEND=postgres` and `API_STATE_DSN`.
+- The QA LangGraph includes conditional routing: low-quality answers are retried once with stronger evidence focus, then converted into an insufficient-evidence response instead of pretending to answer.
 
 ### 6. Incremental Update
 

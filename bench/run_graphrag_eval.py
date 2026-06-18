@@ -24,19 +24,21 @@ def _hit(item: dict[str, Any], response: dict[str, Any]) -> bool:
     source_blob = " ".join(str(source) for source in response.get("sources", []))
     answer_blob = str(response.get("answer", ""))
     terms = item.get("expected_terms", [])
+    answer_terms = item.get("expected_answer_terms", [])
     return item["expected_source"] in source_blob and all(
         term.lower() in (answer_blob + source_blob).lower()
         for term in terms
-    )
+    ) and all(term.lower() in answer_blob.lower() for term in answer_terms)
 
 
 def _source_hit(item: dict[str, Any], sources: list[dict[str, Any]], answer: str = "") -> bool:
     source_blob = " ".join(str(source) for source in sources)
     terms = item.get("expected_terms", [])
+    answer_terms = item.get("expected_answer_terms", [])
     return item["expected_source"] in source_blob and all(
         term.lower() in (answer + source_blob).lower()
         for term in terms
-    )
+    ) and all(term.lower() in answer.lower() for term in answer_terms)
 
 
 def _weighted_sources(

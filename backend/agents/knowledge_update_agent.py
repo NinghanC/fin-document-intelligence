@@ -16,7 +16,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+import structlog
+
 from config import settings
+
+logger = structlog.get_logger("finsight.knowledge_update")
 
 
 class ChangeType(str, Enum):
@@ -90,6 +94,7 @@ class KnowledgeUpdateAgent:
             elif change.change_type == ChangeType.MODIFIED:
                 await self._handle_modify(change, result)
         except Exception as e:
+            logger.warning("knowledge_update_failed", file_path=change.file_path, change_type=change.change_type, error=str(e))
             result.success = False
             result.error = str(e)
 

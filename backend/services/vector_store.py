@@ -14,6 +14,7 @@ import math
 import re
 from typing import Any
 
+import structlog
 from langchain_openai import OpenAIEmbeddings
 from pydantic import SecretStr
 
@@ -21,6 +22,8 @@ from agents.doc_parser_agent import DocumentChunk
 from config import settings
 from services.ingestion_registry import ingestion_registry
 from utils.model_clients import has_provider_key
+
+logger = structlog.get_logger("finsight.vector_store")
 
 
 class _SubprocessEmbeddings:
@@ -126,7 +129,8 @@ class VectorStoreService:
             # Hash embeddings keep the public demo searchable without external keys.
             try:
                 self._embeddings = _create_embeddings()
-            except Exception:
+            except Exception as exc:
+                logger.warning("embedding_provider_failed_using_hash", error=str(exc))
                 self._embeddings = _HashEmbeddings()
         return self._embeddings
 
@@ -137,7 +141,8 @@ class VectorStoreService:
         # Try loading; if it fails, stay disabled
         try:
             return self.embeddings is not None
-        except Exception:
+        except Exception as exc:
+            logger.warning("embeddings_availability_check_failed", error=str(exc))
             return False
 
     # initialization
@@ -218,7 +223,8 @@ class VectorStoreService:
                     ids=ids,
                 )
                 return len(chunks)
-        except Exception:
+        except Exception as exc:
+            logger.warning("vector_add_chunks_failed", backend=self._backend, error=str(exc))
             return 0
 
         return 0
@@ -268,7 +274,8 @@ class VectorStoreService:
         """
         try:
             result = await self._run_sync(self._store.get, include=["documents", "metadatas"])
-        except Exception:
+        except Exception as exc:
+            logger.warning("chroma_lexical_candidate_scan_failed", error=str(exc))
             return []
         documents = result.get("documents", [])
         metadatas = result.get("metadatas", [])
@@ -346,7 +353,8 @@ class VectorStoreService:
                 return {"backend": "chroma", "total_vectors": 0, "collection": self.COLLECTION_NAME}
             try:
                 total_vectors = await self._run_sync(self._store.count)
-            except Exception:
+            except Exception as exc:
+                logger.warning("vector_stats_failed", backend="chroma", error=str(exc))
                 total_vectors = 0
             return {"backend": "chroma", "total_vectors": total_vectors, "collection": self.COLLECTION_NAME}
         return {
@@ -377,7 +385,8 @@ class VectorStoreService:
 
         try:
             return await self._run_sync(_delete)
-        except Exception:
+        except Exception as exc:
+            logger.warning("pgvector_delete_by_doc_id_failed", doc_id=doc_id, error=str(exc))
             return 0
 
     async def _count_pgvector_vectors(self) -> int:
@@ -402,7 +411,8 @@ class VectorStoreService:
 
         try:
             return await self._run_sync(_count)
-        except Exception:
+        except Exception as exc:
+            logger.warning("pgvector_count_failed", error=str(exc))
             return 0
 
     def _pgvector_engine(self) -> Any:

@@ -21,7 +21,12 @@ def _matches(item: dict[str, Any], response: dict[str, Any]) -> bool:
     source_blob = " ".join(str(source) for source in sources)
     expected_source = item["expected_source"]
     terms = item.get("expected_terms", [])
-    return expected_source in source_blob and all(term.lower() in (answer + source_blob).lower() for term in terms)
+    answer_terms = item.get("expected_answer_terms", [])
+    return (
+        expected_source in source_blob
+        and all(term.lower() in (answer + source_blob).lower() for term in terms)
+        and all(term.lower() in answer.lower() for term in answer_terms)
+    )
 
 
 def main() -> None:

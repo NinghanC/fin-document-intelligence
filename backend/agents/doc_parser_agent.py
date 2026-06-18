@@ -18,9 +18,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from utils.model_clients import create_chat_model
+
+logger = structlog.get_logger("finsight.doc_parser")
 
 
 class DocType(str, Enum):
@@ -136,7 +139,8 @@ class DocParserAgent:
                 page_text = page.extract_text() or ""
                 if page_text.strip():
                     texts.append(page_text.strip())
-        except Exception:
+        except Exception as exc:
+            logger.warning("pdf_text_parse_failed", file_path=file_path, error=str(exc))
             texts.append(f"[PDF parsing failed] {file_path}")
 
         if not texts:
@@ -162,7 +166,8 @@ class DocParserAgent:
                 description = await self._describe_image_with_llm(images[0])
                 texts.append(f"[Page {page_number}]\n{description}")
             return texts
-        except Exception:
+        except Exception as exc:
+            logger.warning("pdf_vision_parse_failed", file_path=file_path, error=str(exc))
             return [f"[PDF vision parsing failed] {file_path}"]
 
     # image parsing
@@ -185,7 +190,8 @@ class DocParserAgent:
             import pytesseract
             from PIL import Image
             return pytesseract.image_to_string(Image.open(file_path), lang="eng")
-        except Exception:
+        except Exception as exc:
+            logger.warning("image_ocr_failed", file_path=file_path, error=str(exc))
             return ""
 
     async def _describe_image_with_llm(self, image: Any) -> str:
@@ -228,7 +234,8 @@ class DocParserAgent:
                 return self._parse_csv(file_path)
             else:
                 return self._parse_excel(file_path)
-        except Exception:
+        except Exception as exc:
+            logger.warning("table_parse_failed", file_path=file_path, error=str(exc))
             return [f"[Table parsing failed] {file_path}"]
 
     @staticmethod
@@ -267,7 +274,8 @@ class DocParserAgent:
                     batch = data_rows[i : i + 20]
                     texts.append(f"Worksheet: {sheet.title}\nHeaders: {' | '.join(headers)}\n" + "\n".join(batch))
             return texts or ["[Empty Excel]"]
-        except Exception:
+        except Exception as exc:
+            logger.warning("excel_parse_failed", file_path=file_path, error=str(exc))
             return [f"[Excel parsing failed] {file_path}"]
 
     # text / markdown
