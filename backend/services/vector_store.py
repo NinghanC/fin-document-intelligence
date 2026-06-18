@@ -233,31 +233,97 @@ class VectorStoreService:
             result = await self._run_sync(
                 self._store.query,
                 query_embeddings=[query_embedding],
-                n_results=top_k,
+                n_results=max(top_k * 8, top_k),
                 include=["documents", "metadatas", "distances"],
             )
             documents = result.get("documents", [[]])[0]
             metadatas = result.get("metadatas", [[]])[0]
             distances = result.get("distances", [[]])[0]
-            return [
-                (
-                    {
-                        "content": doc,
-                        "source": metadata.get("source", ""),
-                        "metadata": metadata,
-                    },
+            candidates = [
+                self._score_result(
+                    query,
+                    doc,
+                    metadata,
                     max(0.0, 1.0 - float(distance)),
                 )
                 for doc, metadata, distance in zip(documents, metadatas, distances, strict=False)
                 if ingestion_registry.is_committed(str(metadata.get("doc_id", "")))
             ]
+            candidates.extend(await self._chroma_lexical_candidates(query, top_k=max(top_k * 4, top_k)))
+            return self._merge_ranked_candidates(candidates, top_k)
 
         results = await self._run_sync(self._store.similarity_search_with_score, query, k=top_k)
-        return [
-            ({"content": doc.page_content, "source": doc.metadata.get("source", ""), "metadata": doc.metadata}, score)
+        candidates = [
+            self._score_result(query, doc.page_content, doc.metadata, score)
             for doc, score in results
             if ingestion_registry.is_committed(str(doc.metadata.get("doc_id", "")))
         ]
+        return self._merge_ranked_candidates(candidates, top_k)
+
+    async def _chroma_lexical_candidates(self, query: str, top_k: int) -> list[tuple[dict, float]]:
+        """Scan Chroma documents for exact keyword matches.
+
+        This keeps offline/hash-embedding demos usable for financial metric
+        questions where exact terms matter more than approximate semantics.
+        """
+        try:
+            result = await self._run_sync(self._store.get, include=["documents", "metadatas"])
+        except Exception:
+            return []
+        documents = result.get("documents", [])
+        metadatas = result.get("metadatas", [])
+        candidates = [
+            self._score_result(query, doc, metadata, vector_score=0.0)
+            for doc, metadata in zip(documents, metadatas, strict=False)
+            if ingestion_registry.is_committed(str(metadata.get("doc_id", "")))
+            and self._lexical_score(query, doc) > 0
+        ]
+        candidates.sort(key=lambda item: item[1], reverse=True)
+        return candidates[:top_k]
+
+    @staticmethod
+    def _merge_ranked_candidates(candidates: list[tuple[dict, float]], top_k: int) -> list[tuple[dict, float]]:
+        merged: dict[str, tuple[dict, float]] = {}
+        for doc, score in candidates:
+            key = str(doc["metadata"].get("chunk_id") or doc.get("content", "")[:120])
+            if key not in merged or score > merged[key][1]:
+                merged[key] = (doc, score)
+        ranked = list(merged.values())
+        ranked.sort(key=lambda item: item[1], reverse=True)
+        return ranked[:top_k]
+
+    @classmethod
+    def _score_result(
+        cls,
+        query: str,
+        content: str,
+        metadata: dict[str, Any],
+        vector_score: float,
+    ) -> tuple[dict, float]:
+        lexical_score = cls._lexical_score(query, content)
+        score = min(1.0, max((vector_score * 0.55) + (lexical_score * 0.45), lexical_score * 0.9))
+        return (
+            {
+                "content": content,
+                "source": metadata.get("source", ""),
+                "metadata": {**metadata, "vector_score": vector_score, "lexical_score": lexical_score},
+            },
+            round(score, 6),
+        )
+
+    @staticmethod
+    def _lexical_score(query: str, content: str) -> float:
+        query_tokens = {
+            token
+            for token in re.findall(r"[a-zA-Z0-9]+", query.lower())
+            if len(token) >= 3 and token not in {"and", "for", "the", "their", "what", "which", "did"}
+        }
+        if not query_tokens:
+            return 0.0
+        content_tokens = set(re.findall(r"[a-zA-Z0-9]+", content.lower()))
+        overlap = len(query_tokens & content_tokens) / len(query_tokens)
+        exact_phrase_bonus = 0.15 if query.lower() in content.lower() else 0.0
+        return min(1.0, overlap + exact_phrase_bonus)
 
     async def delete_by_doc_id(self, doc_id: str) -> int:
         """Delete all related vectors by doc_id"""

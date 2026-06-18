@@ -124,9 +124,6 @@ def _build_ingest_graph(
                     entity_count += 1
                 for rel in ext.relations:
                     await knowledge_graph.add_relation(rel, source=ext.source_chunk_id)
-            refresh = getattr(knowledge_graph, "refresh_community_summaries", None)
-            if callable(refresh):
-                await refresh()
         return {**state, "entities_stored": entity_count}
 
     async def store_knowledge(state: dict) -> dict:
@@ -146,6 +143,10 @@ def _build_ingest_graph(
                 store_graph(state),
             )
             ingestion_registry.commit(doc_id)
+            if knowledge_graph:
+                refresh = getattr(knowledge_graph, "refresh_community_summaries", None)
+                if callable(refresh):
+                    await refresh()
             return {
                 **state,
                 "vectors_stored": vector_state.get("vectors_stored", 0),

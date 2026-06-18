@@ -44,7 +44,7 @@ Simple keyword search does not answer questions such as:
 - Find the source document for this compliance requirement.
 - Summarize the relationship between a company, sector, product, and risk factor.
 
-For this environment, the assistant has to be conservative. It should not only generate fluent text. It needs source references, relationship-aware retrieval, confidence signals, and a deployment path that keeps provider choice replaceable.
+For this environment, the assistant has to be conservative. It should not only generate fluent text. It needs source references, relationship-aware retrieval, retrieval-quality signals, and a deployment path that keeps provider choice replaceable.
 
 ## Solution Summary
 
@@ -242,7 +242,7 @@ User Question
 | QuestionResponse                                             |
 | answer: "Global Income Fund mentions liquidity constraints   |
 |          in the redemption and bond sleeve risk sections."   |
-| confidence: 0.87                                             |
+| retrieval_quality: 0.87                                      |
 | sources: [source, score, retrieval_type, snippet]            |
 | reasoning_steps: [...]                                      |
 +-------------------------------------------------------------+
@@ -363,21 +363,30 @@ The intent classifier supports:
 - `procedural`
 - `exploratory`
 
-Hybrid retrieval merges vector, subgraph, path, and cached community-summary contexts. The public prototype uses neutral default weights so it does not pretend hand-picked multipliers are learned relevance scores:
+Hybrid retrieval merges vector, subgraph, path, and cached community-summary contexts. Each branch is scored against the query, then fused with reciprocal rank fusion so vector and graph scores do not need to pretend they live on the same scale.
 
-```text
-vector = 1.0
-subgraph = 1.0
-path = 1.0
-community = 1.0
+#### Fusion Strategy Trade-off
+
+The default application path uses RRF instead of static source weights. This is deliberate:
+
+- Vector similarity, graph traversal scores, path scores, and community-summary scores are not naturally calibrated to the same numeric scale.
+- RRF only depends on rank position inside each retrieval branch, so it is less brittle when one branch has noisier scores.
+- The trade-off is that RRF cannot express a learned preference such as "graph evidence is more reliable for relationship questions" unless a second-stage reranker or branch boost is added.
+
+For that reason, the benchmark keeps a `weighted-grid` mode as an experiment, not as the production default. It reranks the API-returned vector/graph source branches with candidate branch boosts and reports whether any boost improves expected-source hit rate. This is useful for deciding whether weighted fusion is worth implementing deeper in the retrieval stack. It should not be presented as learned production weighting until it is run against a labeled retrieval set with candidate-level outputs.
+
+The `bench/` directory includes a small evaluation scaffold for expected-source checks and future recall@k reporting on a labeled retrieval set:
+
+```bash
+python bench/run_graphrag_eval.py --mode rrf
+python bench/run_graphrag_eval.py --mode weighted-grid
+python bench/run_graphrag_eval.py --mode both
 ```
-
-Non-uniform GraphRAG weights should be tuned with a labeled retrieval set. The `bench/` directory includes a small evaluation scaffold for expected-source checks and future recall@k tuning.
 
 The response includes:
 
 - answer
-- retrieval-quality confidence signal
+- retrieval-quality signal
 - intent
 - source snippets
 - reasoning steps

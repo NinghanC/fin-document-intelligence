@@ -22,7 +22,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeGuard
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -45,21 +45,37 @@ Return JSON: {"entities": ["entity_1", "entities2"]}
 Return only JSON.
 """
 
-DEFAULT_RERANK_WEIGHTS = {
-    # Neutral defaults. Use bench/run_graphrag_eval.py to tune these on a
-    # labeled retrieval set before claiming one source type should dominate.
-    "vector": 1.0,
-    "subgraph": 1.0,
-    "path": 1.0,
-    "community": 1.0,
-}
-
 DEFAULT_ALIAS_TABLE = {
     "msft": "Microsoft",
     "microsoft corp": "Microsoft",
     "microsoft corporation": "Microsoft",
     "aapl": "Apple Inc",
     "apple": "Apple Inc",
+}
+
+ENTITY_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "as",
+    "did",
+    "do",
+    "does",
+    "for",
+    "from",
+    "how",
+    "in",
+    "of",
+    "report",
+    "reported",
+    "the",
+    "to",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
 }
 
 
@@ -77,35 +93,45 @@ class GraphRAGPipeline:
         self,
         vector_store: VectorStoreService,
         knowledge_graph: KnowledgeGraphService,
-        rerank_weights: dict[str, float] | None = None,
         alias_table: dict[str, str] | None = None,
     ) -> None:
         self.vector_store = vector_store
         self.knowledge_graph = knowledge_graph
         self.llm = create_chat_model()
         self.embeddings = _create_embeddings()
-        self.rerank_weights = rerank_weights or DEFAULT_RERANK_WEIGHTS
         self.alias_table = {**DEFAULT_ALIAS_TABLE, **(alias_table or {})}
 
     async def retrieve(self, query: str, top_k: int = 10) -> list[GraphRAGContext]:
         """
         Hybrid retrieval entry point
-        Run vector retrieval and graph retrieval in parallel, then cross-rerank
+        Run independent retrieval branches in parallel, then cross-rerank.
+        Branch failures degrade to the remaining retrieval sources.
         """
-        vector_task = asyncio.create_task(self._vector_search(query, top_k=top_k))
-        entity_task = asyncio.create_task(self._entity_linking(query))
+        vector_result, entity_result = await asyncio.gather(
+            self._vector_search(query, top_k=top_k),
+            self._entity_linking(query),
+            return_exceptions=True,
+        )
 
-        entities = await entity_task
-        vector_results, subgraph_results, path_results, community_results = await asyncio.gather(
-            vector_task,
+        all_results: list[GraphRAGContext] = []
+        if self._is_context_list(vector_result):
+            all_results.extend(vector_result)
+
+        if isinstance(entity_result, BaseException):
+            return (await self._cross_rerank(all_results, query))[:top_k]
+        entities = entity_result
+
+        branch_results = await asyncio.gather(
             self._subgraph_search(entities, query=query),
             self._path_search(entities),
             self._community_retrieve(entities),
+            return_exceptions=True,
         )
+        for branch_result in branch_results:
+            if self._is_context_list(branch_result):
+                all_results.extend(branch_result)
 
-        all_results = vector_results + subgraph_results + path_results + community_results
-
-        reranked = self._cross_rerank(all_results, query)
+        reranked = await self._cross_rerank(all_results, query)
         return reranked[:top_k]
 
     # Step 1: Vector retrieval
@@ -133,7 +159,11 @@ class GraphRAGPipeline:
             if cleaned.startswith("```"):
                 cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0]
             data = json.loads(cleaned)
-            mentions = [str(entity) for entity in data.get("entities", []) if entity]
+            mentions = [
+                str(entity)
+                for entity in data.get("entities", [])
+                if entity and self._normalize_entity_name(str(entity)) not in ENTITY_STOPWORDS
+            ]
         except (json.JSONDecodeError, IndexError):
             mentions = []
 
@@ -269,9 +299,13 @@ class GraphRAGPipeline:
         if not entities:
             return []
         summaries = await self.knowledge_graph.get_community_summaries(entities)
-        return [
-            GraphRAGContext(
-                content=summary.get("summary", ""),
+        contexts: list[GraphRAGContext] = []
+        for summary in summaries:
+            content = str(summary.get("summary", ""))
+            if not content or "No direct relationships captured" in content:
+                continue
+            contexts.append(GraphRAGContext(
+                content=content,
                 source_type="community",
                 score=self._community_score(entities, summary),
                 metadata={
@@ -279,21 +313,23 @@ class GraphRAGPipeline:
                     "members": summary.get("members", []),
                     "score_method": "member_overlap_lexical",
                 },
-            )
-            for summary in summaries
-            if summary.get("summary")
-        ]
+            ))
+        return contexts
+
+    @staticmethod
+    def _is_context_list(value: object) -> TypeGuard[list[GraphRAGContext]]:
+        return isinstance(value, list)
 
     # Step 6: cross-rerank
-    def _cross_rerank(self, contexts: list[GraphRAGContext], query: str) -> list[GraphRAGContext]:
+    async def _cross_rerank(self, contexts: list[GraphRAGContext], query: str) -> list[GraphRAGContext]:
         """
-        Cross-reranking strategy.
+        Cross-rerank with query relevance inside each branch and RRF across branches.
 
-        Default weights are neutral. Non-uniform weights should come from an
-        evaluation run, not intuition.
+        RRF uses rank positions instead of assuming vector, path, subgraph, and
+        community scores are directly comparable.
         """
+        await self._score_by_query_embedding(query, contexts)
         for ctx in contexts:
-            ctx.score *= self.rerank_weights.get(ctx.source_type, 1.0)
             ctx.metadata["dedup_key"] = self._dedup_key(ctx.content)
 
         seen: set[str] = set()
@@ -304,8 +340,53 @@ class GraphRAGPipeline:
                 seen.add(key)
                 unique.append(ctx)
 
-        unique.sort(key=lambda c: c.score, reverse=True)
-        return unique
+        return self._reciprocal_rank_fusion(unique)
+
+    async def _score_by_query_embedding(self, query: str, contexts: list[GraphRAGContext]) -> None:
+        if not contexts:
+            return
+        query_vector = await self.embeddings.aembed_query(query)
+        content_vectors = await self.embeddings.aembed_documents([ctx.content for ctx in contexts])
+        for ctx, vector in zip(contexts, content_vectors, strict=False):
+            base_score = ctx.score
+            semantic_score = max(0.0, min(self._cosine_similarity(query_vector, vector), 1.0))
+            ctx.score = round(semantic_score, 4)
+            ctx.metadata["base_score"] = base_score
+            ctx.metadata["score_method"] = "embedding_similarity"
+
+    @staticmethod
+    def _reciprocal_rank_fusion(contexts: list[GraphRAGContext], rrf_k: int = 60) -> list[GraphRAGContext]:
+        fused: dict[str, tuple[GraphRAGContext, float, list[str]]] = {}
+        for source_type in ("vector", "subgraph", "path", "community"):
+            branch = sorted(
+                [ctx for ctx in contexts if ctx.source_type == source_type],
+                key=lambda item: item.score,
+                reverse=True,
+            )
+            for rank, ctx in enumerate(branch, start=1):
+                key = str(ctx.metadata.get("dedup_key", ctx.content))
+                contribution = 1 / (rrf_k + rank)
+                if key in fused:
+                    existing, score, sources = fused[key]
+                    if ctx.score > existing.score:
+                        existing = ctx
+                    fused[key] = (existing, score + contribution, [*sources, source_type])
+                else:
+                    fused[key] = (ctx, contribution, [source_type])
+
+        best = max((score for _, score, _ in fused.values()), default=1.0)
+        ranked: list[GraphRAGContext] = []
+        for ctx, score, sources in fused.values():
+            ctx.metadata["rrf_score"] = round(score, 6)
+            ctx.metadata["rrf_sources"] = sorted(set(sources))
+            ctx.score = round(score / best, 4)
+            ranked.append(ctx)
+
+        ranked.sort(
+            key=lambda item: (float(item.metadata.get("rrf_score", 0.0)), item.score),
+            reverse=True,
+        )
+        return ranked
 
     @staticmethod
     def _normalize_entity_name(value: str) -> str:

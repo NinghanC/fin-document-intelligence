@@ -25,10 +25,10 @@ def _worker_process(request_queue: multiprocessing.Queue, response_queue: multip
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer(_MODEL_NAME, device=_DEVICE)
         model.encode("warmup", show_progress_bar=False)
-        response_queue.put(("ready", _MODEL_NAME))
+        response_queue.put({"status": "ready", "model": _MODEL_NAME})
         print(f"[embedding_worker] Model loaded: {_MODEL_NAME}", flush=True)
     except Exception as e:
-        response_queue.put(("error", str(e)))
+        response_queue.put({"status": "error", "message": str(e)})
         return
 
     while True:
@@ -37,15 +37,16 @@ def _worker_process(request_queue: multiprocessing.Queue, response_queue: multip
         except queue.Empty:
             continue
 
-        if msg is None or msg[0] == "shutdown":
+        if msg is None:
             break
 
-        msg_id, texts = msg  # ("encode", [...])
+        msg_id = msg["id"]
+        texts = msg["texts"]
         try:
             vectors = model.encode(texts, show_progress_bar=False).tolist()
-            response_queue.put((msg_id, vectors))
+            response_queue.put({"id": msg_id, "embeddings": vectors})
         except Exception as e:
-            response_queue.put((msg_id, f"ERROR: {e}"))
+            response_queue.put({"id": msg_id, "error": str(e)})
 
 
 class EmbeddingClient:
@@ -73,10 +74,10 @@ class EmbeddingClient:
         # Wait for model to load
         try:
             result = self._response_queue.get(timeout=60)
-            if result[0] == "error":
-                raise RuntimeError(f"Worker failed to load model: {result[1]}")
-            if result[0] != "ready":
-                raise RuntimeError(f"Unexpected embedding worker startup response: {result[0]}")
+            if result.get("status") == "error":
+                raise RuntimeError(f"Worker failed to load model: {result.get('message', '')}")
+            if result.get("status") != "ready":
+                raise RuntimeError(f"Unexpected embedding worker startup response: {result}")
         except queue.Empty as exc:
             raise RuntimeError("Embedding worker timed out during startup") from exc
 
@@ -85,8 +86,8 @@ class EmbeddingClient:
             return
         assert self._request_queue is not None
         with suppress(Exception):
-            self._request_queue.put(("shutdown", None))
-        self._process.join(timeout=5)
+            self._request_queue.put(None)
+        self._process.join(timeout=_SHUTDOWN_TIMEOUT)
         if self._process.is_alive():
             self._process.terminate()
         self._process = None
@@ -100,12 +101,14 @@ class EmbeddingClient:
         assert self._response_queue is not None
         self._counter += 1
         msg_id = f"enc_{self._counter}"
-        self._request_queue.put((msg_id, texts))
+        self._request_queue.put({"id": msg_id, "texts": texts})
         try:
-            msg_id_resp, result = self._response_queue.get(timeout=300)
-            if isinstance(result, str) and result.startswith("ERROR:"):
-                raise RuntimeError(result)
-            return result
+            response = self._response_queue.get(timeout=300)
+            if response.get("id") != msg_id:
+                raise RuntimeError(f"Unexpected embedding worker response id: {response}")
+            if response.get("error"):
+                raise RuntimeError(str(response["error"]))
+            return response["embeddings"]
         except queue.Empty as exc:
             raise RuntimeError("Embedding worker timed out") from exc
 

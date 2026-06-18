@@ -46,8 +46,13 @@ class QAResult:
     answer: str
     contexts: list[RetrievedContext]
     intent: QueryIntent
-    confidence: float
+    retrieval_quality: float
     reasoning_steps: list[str] = field(default_factory=list)
+
+    @property
+    def confidence(self) -> float:
+        """Backward-compatible alias for older clients."""
+        return self.retrieval_quality
 
 
 INTENT_PROMPT = """\
@@ -90,6 +95,16 @@ Requirements:
 5. Keep the response professional, accurate, and concise
 """
 
+FACTOID_PROMPT = ANSWER_PROMPT + "\nAnswer in one or two sentences. Cite the strongest source."
+
+COMPARATIVE_PROMPT = ANSWER_PROMPT + "\nCompare the requested entities or options explicitly. Use a compact table or grouped bullets when helpful."
+
+ANALYTICAL_PROMPT = ANSWER_PROMPT + "\nProvide an evidence-backed analysis. Explain the key drivers, caveats, and source support."
+
+PROCEDURAL_PROMPT = ANSWER_PROMPT + "\nReturn clear ordered steps. Cite the source for each material step when available."
+
+EXPLORATORY_PROMPT = ANSWER_PROMPT + "\nGive a structured overview of options, themes, and open questions supported by the sources."
+
 
 class QAAgent:
     """
@@ -120,8 +135,7 @@ class QAAgent:
         intent = await self._classify_intent(question)
         rewritten = await self._rewrite_query(question)
 
-        all_contexts = await self._retrieve_contexts(question, rewritten)
-        top_contexts = self._balanced_top_contexts(all_contexts, limit=self._context_limit_for_intent(intent))
+        top_contexts = await self._retrieve_for_intent(question, rewritten, intent)
 
         answer_text, reasoning = await self._generate_answer(question, top_contexts, intent)
 
@@ -130,15 +144,38 @@ class QAAgent:
             answer=answer_text,
             contexts=top_contexts,
             intent=intent,
-            confidence=self._calc_confidence(top_contexts),
+            retrieval_quality=self._calc_retrieval_quality(top_contexts),
             reasoning_steps=reasoning,
         )
 
-    async def _retrieve_contexts(self, question: str, rewritten: dict) -> list[RetrievedContext]:
+    async def _retrieve_for_intent(self, question: str, rewritten: dict, intent: QueryIntent) -> list[RetrievedContext]:
+        if intent == QueryIntent.FACTOID:
+            contexts = await self._retrieve_contexts(question, rewritten, top_k=6)
+            return self._balanced_top_contexts(contexts, limit=3)
+
+        if intent == QueryIntent.COMPARATIVE:
+            contexts = await self._retrieve_per_entity(question, rewritten, per_entity_k=3)
+            if not contexts:
+                contexts = await self._retrieve_contexts(question, rewritten, top_k=12)
+            return self._balanced_top_contexts(contexts, limit=10)
+
+        if intent == QueryIntent.PROCEDURAL:
+            contexts = await self._retrieve_contexts(question, rewritten, top_k=10)
+            policy_contexts = self._prioritize_policy_contexts(contexts)
+            return self._balanced_top_contexts(policy_contexts, limit=8)
+
+        if intent == QueryIntent.ANALYTICAL:
+            contexts = await self._retrieve_contexts(question, rewritten, top_k=14)
+            return self._balanced_top_contexts(contexts, limit=10)
+
+        contexts = await self._retrieve_contexts(question, rewritten, top_k=12)
+        return self._balanced_top_contexts(contexts, limit=10)
+
+    async def _retrieve_contexts(self, question: str, rewritten: dict, top_k: int = 20) -> list[RetrievedContext]:
         """Use the GraphRAG service when available, with the original hybrid path as fallback."""
         if self.graph_rag is not None:
             try:
-                graph_rag_contexts = await self.graph_rag.retrieve(question, top_k=20)
+                graph_rag_contexts = await self.graph_rag.retrieve(question, top_k=top_k)
                 contexts = [
                     RetrievedContext(
                         content=ctx.content,
@@ -153,9 +190,46 @@ class QAAgent:
             except Exception:
                 pass
 
-        vector_contexts = await self._vector_retrieve(rewritten)
+        vector_contexts = await self._vector_retrieve(rewritten, top_k=top_k)
         graph_contexts = await self._graph_retrieve(question, rewritten)
         return self._apply_multimodal_weights(self._hybrid_rerank(vector_contexts + graph_contexts))
+
+    async def _retrieve_per_entity(self, question: str, rewritten: dict, per_entity_k: int = 3) -> list[RetrievedContext]:
+        entities = [str(entity) for entity in rewritten.get("entities", []) if entity]
+        if not entities:
+            return []
+
+        contexts: list[RetrievedContext] = []
+        for entity in entities:
+            entity_rewrite = {
+                **rewritten,
+                "queries": [f"{entity} {question}"],
+                "entities": [entity],
+            }
+            contexts.extend(await self._retrieve_contexts(question, entity_rewrite, top_k=per_entity_k))
+        return self._apply_multimodal_weights(self._hybrid_rerank(contexts))
+
+    @staticmethod
+    def _prioritize_policy_contexts(contexts: list[RetrievedContext]) -> list[RetrievedContext]:
+        policy_terms = ("policy", "procedure", "process", "playbook", "control", "step", "workflow")
+        prioritized: list[RetrievedContext] = []
+        fallback: list[RetrievedContext] = []
+        for context in contexts:
+            haystack = " ".join([
+                context.content,
+                context.source,
+                str(context.metadata.get("doc_type", "")),
+                str(context.metadata.get("source_type", "")),
+            ]).lower()
+            if any(term in haystack for term in policy_terms):
+                context.score = min(context.score + 0.15, 1.0)
+                context.metadata["intent_filter"] = "policy_procedure"
+                prioritized.append(context)
+            else:
+                fallback.append(context)
+        return sorted(prioritized, key=lambda ctx: ctx.score, reverse=True) + sorted(
+            fallback, key=lambda ctx: ctx.score, reverse=True
+        )
 
     def _apply_multimodal_weights(self, contexts: list[RetrievedContext]) -> list[RetrievedContext]:
         """Apply modality-aware reranking to vector contexts before final balancing."""
@@ -224,13 +298,13 @@ class QAAgent:
             return {"queries": [question], "entities": [], "keywords": []}
 
     # vector retrieval
-    async def _vector_retrieve(self, rewritten: dict) -> list[RetrievedContext]:
+    async def _vector_retrieve(self, rewritten: dict, top_k: int = 5) -> list[RetrievedContext]:
         if not self.vector_store:
             return []
 
         contexts: list[RetrievedContext] = []
         for query in rewritten.get("queries", []):
-            results = await self.vector_store.search(query, top_k=5)
+            results = await self.vector_store.search(query, top_k=top_k)
             for doc, score in results:
                 contexts.append(RetrievedContext(
                     content=doc.get("content", ""),
@@ -281,7 +355,10 @@ class QAAgent:
     @staticmethod
     def _hybrid_rerank(contexts: list[RetrievedContext]) -> list[RetrievedContext]:
         """
-        Hybrid reranking based on retrieval scores already computed by each branch.
+        Hybrid reranking with reciprocal rank fusion.
+
+        Vector similarity and graph relevance are not guaranteed to share a
+        calibrated score scale, so fusion uses rank positions per branch.
         """
         seen: set[str] = set()
         unique: list[RetrievedContext] = []
@@ -291,8 +368,34 @@ class QAAgent:
                 seen.add(key)
                 unique.append(ctx)
 
-        unique.sort(key=lambda c: c.score, reverse=True)
-        return unique
+        fused: dict[str, tuple[RetrievedContext, float, list[str]]] = {}
+        for retrieval_type in ("vector", "graph"):
+            branch = sorted(
+                [ctx for ctx in unique if ctx.retrieval_type == retrieval_type],
+                key=lambda item: item.score,
+                reverse=True,
+            )
+            for rank, ctx in enumerate(branch, start=1):
+                key = ctx.content[:100]
+                contribution = 1 / (60 + rank)
+                if key in fused:
+                    existing, score, sources = fused[key]
+                    if ctx.score > existing.score:
+                        existing = ctx
+                    fused[key] = (existing, score + contribution, [*sources, retrieval_type])
+                else:
+                    fused[key] = (ctx, contribution, [retrieval_type])
+
+        best = max((score for _, score, _ in fused.values()), default=1.0)
+        reranked: list[RetrievedContext] = []
+        for ctx, score, sources in fused.values():
+            ctx.metadata["rrf_score"] = round(score, 6)
+            ctx.metadata["rrf_sources"] = sorted(set(sources))
+            ctx.score = round(score / best, 4)
+            reranked.append(ctx)
+
+        reranked.sort(key=lambda ctx: float(ctx.metadata.get("rrf_score", 0.0)), reverse=True)
+        return reranked
 
     @classmethod
     def _graph_record_score(cls, question: str, record: dict[str, Any]) -> float:
@@ -328,7 +431,7 @@ class QAAgent:
         ]
 
         if contexts:
-            system_prompt = ANSWER_PROMPT
+            system_prompt = self._prompt_for_intent(intent)
             user_prompt = f"Context information:\n{context_text}\n\nUser question: {question}"
         else:
             system_prompt = "You are a professional enterprise knowledge QA assistant. The current knowledge base is empty, so answer the user question directly from your own knowledge. Keep the response professional, accurate, and concise."
@@ -342,7 +445,17 @@ class QAAgent:
         return resp.content, reasoning_steps
 
     @staticmethod
-    def _calc_confidence(contexts: list[RetrievedContext]) -> float:
+    def _prompt_for_intent(intent: QueryIntent) -> str:
+        return {
+            QueryIntent.FACTOID: FACTOID_PROMPT,
+            QueryIntent.COMPARATIVE: COMPARATIVE_PROMPT,
+            QueryIntent.ANALYTICAL: ANALYTICAL_PROMPT,
+            QueryIntent.PROCEDURAL: PROCEDURAL_PROMPT,
+            QueryIntent.EXPLORATORY: EXPLORATORY_PROMPT,
+        }.get(intent, ANSWER_PROMPT)
+
+    @staticmethod
+    def _calc_retrieval_quality(contexts: list[RetrievedContext]) -> float:
         """Interpretable retrieval-quality signal, not a probability."""
         if not contexts:
             return 0.0
@@ -350,5 +463,7 @@ class QAAgent:
         unique_sources = len({c.source for c in contexts if c.source})
         source_diversity = min(unique_sources / 3, 1.0)
         has_graph_support = any(c.retrieval_type == "graph" for c in contexts)
-        confidence = (best_score * 0.5) + (source_diversity * 0.3) + (0.2 if has_graph_support else 0.0)
-        return round(min(confidence, 1.0), 2)
+        retrieval_quality = (best_score * 0.5) + (source_diversity * 0.3) + (0.2 if has_graph_support else 0.0)
+        return round(min(retrieval_quality, 1.0), 2)
+
+    _calc_confidence = _calc_retrieval_quality

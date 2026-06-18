@@ -73,6 +73,8 @@ class KnowledgeUpdateAgent:
         self.knowledge_graph = knowledge_graph
         self._file_hashes: dict[str, str] = {}
         self._version_counter: dict[str, int] = {}
+        self._observer: Any = None
+        self._watch_thread: Any = None
 
     # public API
     async def process_change(self, change: DocumentChange) -> UpdateResult:
@@ -170,11 +172,12 @@ class KnowledgeUpdateAgent:
 
         observer = Observer()
         observer.schedule(_Handler(), directory, recursive=True)
+        self._observer = observer
 
         def _run():
             observer.start()
             try:
-                while True:
+                while observer.is_alive():
                     time.sleep(1)
             except KeyboardInterrupt:
                 observer.stop()
@@ -182,7 +185,18 @@ class KnowledgeUpdateAgent:
 
         t = threading.Thread(target=_run, daemon=True)
         t.start()
+        self._watch_thread = t
         return observer
+
+    def stop_watching(self) -> None:
+        """Stop the watchdog observer and join its background thread."""
+        if self._observer is not None:
+            self._observer.stop()
+            self._observer.join(timeout=5)
+            self._observer = None
+        if self._watch_thread is not None and self._watch_thread.is_alive():
+            self._watch_thread.join(timeout=5)
+        self._watch_thread = None
 
     # kafka CDC mode
     async def start_kafka_consumer(self) -> None:

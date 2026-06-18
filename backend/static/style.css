@@ -810,7 +810,7 @@ body {
   font-size: 11px;
 }
 
-.chat-tag--confidence {
+.chat-tag--retrieval-quality {
   background: var(--emerald-50);
   color: var(--emerald-600);
   border: 1px solid var(--emerald-100);

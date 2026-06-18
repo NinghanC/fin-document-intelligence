@@ -67,8 +67,9 @@ class DocParserAgent:
         ".md": DocType.MARKDOWN,
     }
 
-    CHUNK_SIZE = 512
-    CHUNK_OVERLAP = 64
+    CHUNK_MAX_TOKENS = 256
+    CHUNK_OVERLAP_SENTENCES = 1
+    CHUNK_OVERLAP_PARAGRAPHS = 1
     IMAGE_MAX_SIDE = 1600
 
     def __init__(self) -> None:
@@ -286,7 +287,7 @@ class DocParserAgent:
         chunks: list[DocumentChunk] = []
         idx = 0
         for text in texts:
-            for start, end, content in self._sentence_aware_spans(text):
+            for start, end, content in self._token_budget_spans(text):
                 if content.strip():
                     chunks.append(DocumentChunk(
                         content=content.strip(),
@@ -298,38 +299,136 @@ class DocParserAgent:
                     idx += 1
         return chunks
 
-    def _sentence_aware_spans(self, text: str) -> list[tuple[int, int, str]]:
-        sentence_matches = list(re.finditer(r"[^.!?\n]+(?:[.!?]+|\n+|$)", text))
-        spans = [(match.start(), match.end(), match.group().strip()) for match in sentence_matches if match.group().strip()]
-        if not spans:
-            spans = [(0, len(text), text)]
+    def _token_budget_spans(self, text: str) -> list[tuple[int, int, str]]:
+        paragraph_spans = self._paragraph_spans(text)
+        if not paragraph_spans:
+            return []
 
         chunks: list[tuple[int, int, str]] = []
-        current_parts: list[str] = []
-        current_start = spans[0][0]
-        current_end = spans[0][1]
+        current: list[tuple[int, int, str]] = []
+        current_tokens = 0
 
-        for start, end, sentence in spans:
-            candidate = " ".join([*current_parts, sentence]).strip()
-            if current_parts and len(candidate) > self.CHUNK_SIZE:
-                content = " ".join(current_parts).strip()
-                chunks.append((current_start, current_end, content))
-                overlap_text = content[-self.CHUNK_OVERLAP :].rsplit(" ", 1)[0]
-                current_parts = [overlap_text, sentence] if overlap_text else [sentence]
-                current_start = max(current_start, current_end - len(overlap_text)) if overlap_text else start
-                current_end = end
-            else:
-                current_parts.append(sentence)
-                current_end = end
+        for start, end, paragraph in paragraph_spans:
+            paragraph_tokens = self._approx_token_count(paragraph)
+            if paragraph_tokens > self.CHUNK_MAX_TOKENS:
+                if current:
+                    chunks.append(self._merge_paragraph_spans(current, text))
+                    current = []
+                    current_tokens = 0
+                chunks.extend(self._split_long_paragraph(start, paragraph))
+                continue
 
-            while current_parts and len(" ".join(current_parts)) > self.CHUNK_SIZE * 1.5:
-                long_text = " ".join(current_parts)
-                split_at = long_text.rfind(" ", 0, self.CHUNK_SIZE)
-                split_at = split_at if split_at > 0 else self.CHUNK_SIZE
-                chunks.append((current_start, current_start + split_at, long_text[:split_at].strip()))
-                current_parts = [long_text[max(0, split_at - self.CHUNK_OVERLAP) :].strip()]
-                current_start += max(0, split_at - self.CHUNK_OVERLAP)
+            if current and current_tokens + paragraph_tokens > self.CHUNK_MAX_TOKENS:
+                chunks.append(self._merge_paragraph_spans(current, text))
+                current = self._paragraph_overlap_tail(current)
+                current_tokens = sum(self._approx_token_count(item[2]) for item in current)
 
-        if current_parts:
-            chunks.append((current_start, len(text), " ".join(current_parts).strip()))
+            if current and current_tokens + paragraph_tokens > self.CHUNK_MAX_TOKENS:
+                chunks.append(self._merge_paragraph_spans(current, text))
+                current = []
+                current_tokens = 0
+
+            current.append((start, end, paragraph))
+            current_tokens += paragraph_tokens
+
+        if current:
+            chunks.append(self._merge_paragraph_spans(current, text))
+        return chunks
+
+    @staticmethod
+    def _paragraph_spans(text: str) -> list[tuple[int, int, str]]:
+        spans = [
+            (match.start(), match.end(), match.group().strip())
+            for match in re.finditer(r"\S.*?(?=\n\s*\n|$)", text, re.DOTALL)
+            if match.group().strip()
+        ]
+        return spans or [(0, len(text), text.strip())] if text.strip() else []
+
+    @staticmethod
+    def _sentence_spans(text: str) -> list[tuple[int, int, str]]:
+        pattern = re.compile(r"\S.*?(?:[.!?](?=\s+|$)|\n{2,}|$)", re.DOTALL)
+        spans = [
+            (match.start(), match.end(), match.group().strip())
+            for match in pattern.finditer(text)
+            if match.group().strip()
+        ]
+        return spans or [(0, len(text), text.strip())] if text.strip() else []
+
+    @staticmethod
+    def _approx_token_count(text: str) -> int:
+        return len(re.findall(r"\w+|[^\w\s]", text))
+
+    def _overlap_tail(self, spans: list[tuple[int, int, str]]) -> list[tuple[int, int, str]]:
+        if self.CHUNK_OVERLAP_SENTENCES <= 0:
+            return []
+        return spans[-self.CHUNK_OVERLAP_SENTENCES :]
+
+    def _paragraph_overlap_tail(self, spans: list[tuple[int, int, str]]) -> list[tuple[int, int, str]]:
+        if self.CHUNK_OVERLAP_PARAGRAPHS <= 0 or len(spans) <= 1:
+            return []
+        return spans[-self.CHUNK_OVERLAP_PARAGRAPHS :]
+
+    @staticmethod
+    def _merge_paragraph_spans(spans: list[tuple[int, int, str]], original_text: str) -> tuple[int, int, str]:
+        start, end = spans[0][0], spans[-1][1]
+        return start, end, original_text[start:end].strip()
+
+    @staticmethod
+    def _merge_sentence_spans(spans: list[tuple[int, int, str]]) -> tuple[int, int, str]:
+        return spans[0][0], spans[-1][1], " ".join(span[2] for span in spans).strip()
+
+    def _split_long_paragraph(self, start: int, paragraph: str) -> list[tuple[int, int, str]]:
+        sentence_spans = self._sentence_spans(paragraph)
+        if not sentence_spans:
+            return self._split_long_sentence(start, paragraph)
+
+        chunks: list[tuple[int, int, str]] = []
+        current: list[tuple[int, int, str]] = []
+        current_tokens = 0
+        for sentence_start, sentence_end, sentence in sentence_spans:
+            sentence_tokens = self._approx_token_count(sentence)
+            absolute_sentence = (start + sentence_start, start + sentence_end, sentence)
+            if sentence_tokens > self.CHUNK_MAX_TOKENS:
+                if current:
+                    chunks.append(self._merge_sentence_spans(current))
+                    current = []
+                    current_tokens = 0
+                chunks.extend(self._split_long_sentence(start + sentence_start, sentence))
+                continue
+
+            if current and current_tokens + sentence_tokens > self.CHUNK_MAX_TOKENS:
+                chunks.append(self._merge_sentence_spans(current))
+                current = self._overlap_tail(current)
+                current_tokens = sum(self._approx_token_count(item[2]) for item in current)
+
+            if current and current_tokens + sentence_tokens > self.CHUNK_MAX_TOKENS:
+                chunks.append(self._merge_sentence_spans(current))
+                current = []
+                current_tokens = 0
+
+            current.append(absolute_sentence)
+            current_tokens += sentence_tokens
+
+        if current:
+            chunks.append(self._merge_sentence_spans(current))
+        return chunks
+
+    def _split_long_sentence(self, start: int, sentence: str) -> list[tuple[int, int, str]]:
+        tokens = re.finditer(r"\S+", sentence)
+        chunks: list[tuple[int, int, str]] = []
+        current_words: list[tuple[int, int, str]] = []
+        current_tokens = 0
+        for match in tokens:
+            word = match.group()
+            token_count = self._approx_token_count(word)
+            if current_words and current_tokens + token_count > self.CHUNK_MAX_TOKENS:
+                chunk_text = " ".join(item[2] for item in current_words)
+                chunks.append((start + current_words[0][0], start + current_words[-1][1], chunk_text))
+                current_words = current_words[-self.CHUNK_OVERLAP_SENTENCES :]
+                current_tokens = sum(self._approx_token_count(item[2]) for item in current_words)
+            current_words.append((match.start(), match.end(), word))
+            current_tokens += token_count
+        if current_words:
+            chunk_text = " ".join(item[2] for item in current_words)
+            chunks.append((start + current_words[0][0], start + current_words[-1][1], chunk_text))
         return chunks

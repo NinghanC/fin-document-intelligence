@@ -148,66 +148,56 @@ class CDCProcessor:
     # Version Management
     def bump_version(self, resource_path: str) -> int:
         """Increment the resource version number"""
-        current = self._version_map.get(resource_path, 0)
-        new_version = current + 1
-        self._version_map[resource_path] = new_version
-        return new_version
+        return self._commit_version(resource_path)
 
     def get_version(self, resource_path: str) -> int:
         return self._version_map.get(resource_path, 0)
 
     # Processing
     async def process_event(self, event: CDCEvent) -> CDCProcessResult:
-        """Process a single CDC event"""
+        """Process a single CDC event through the configured update pipeline."""
         start = time.time()
         result = CDCProcessResult(event=event)
+        self._processing_queue.append(event)
 
         try:
-            version = self.bump_version(event.resource_path)
-            result.version = version
-
-            if event.operation == "DELETE":
-                result.chunks_affected = -1
-                result.entities_affected = -1
-            elif event.operation == "INSERT":
-                result.chunks_affected = 1
-                result.entities_affected = 1
-            elif event.operation == "UPDATE":
-                if event.before and event.after:
-                    diff = self.compute_diff(
-                        event.before.get("content", ""),
-                        event.after.get("content", ""),
-                    )
-                    event.diff = diff
-                    if diff["is_major_change"]:
-                        result.chunks_affected = diff["added_count"]
-                    else:
-                        result.chunks_affected = max(1, diff["added_count"] // 10)
+            if event.operation == "UPDATE" and event.before and event.after:
+                event.diff = self.compute_diff(
+                    event.before.get("content", ""),
+                    event.after.get("content", ""),
+                )
 
             update_result = await self._apply_update(event)
-            if update_result is not None:
-                result.update_result = self._serialize_update_result(update_result)
-                result.chunks_affected = (
-                    getattr(update_result, "vectors_added", 0)
-                    - getattr(update_result, "vectors_deleted", 0)
-                    or result.chunks_affected
-                )
-                result.entities_affected = (
-                    getattr(update_result, "entities_added", 0)
-                    + getattr(update_result, "entities_updated", 0)
-                    or result.entities_affected
-                )
-                if not getattr(update_result, "success", True):
-                    result.success = False
-                    result.error = getattr(update_result, "error", "")
+            result.update_result = self._serialize_update_result(update_result)
+            result.chunks_affected = getattr(update_result, "vectors_added", 0) - getattr(
+                update_result, "vectors_deleted", 0
+            )
+            result.entities_affected = getattr(update_result, "entities_added", 0) + getattr(
+                update_result, "entities_updated", 0
+            )
+            if not getattr(update_result, "success", True):
+                result.success = False
+                result.error = getattr(update_result, "error", "")
+            else:
+                result.version = self._commit_version(event.resource_path)
 
             self._event_log.append(event)
         except Exception as e:
             result.success = False
             result.error = str(e)
+            self._event_log.append(event)
+        finally:
+            if event in self._processing_queue:
+                self._processing_queue.remove(event)
 
         result.processing_time_ms = (time.time() - start) * 1000
         return result
+
+    def _commit_version(self, resource_path: str) -> int:
+        current = self._version_map.get(resource_path, 0)
+        new_version = current + 1
+        self._version_map[resource_path] = new_version
+        return new_version
 
     async def process_batch(self, events: list[CDCEvent]) -> list[CDCProcessResult]:
         """Process CDC events in a batch"""
@@ -248,7 +238,7 @@ class CDCProcessor:
 
     async def _apply_update(self, event: CDCEvent) -> Any | None:
         if self._update_handler is None:
-            return None
+            raise RuntimeError("CDC update handler is not configured")
         from agents.knowledge_update_agent import ChangeType, DocumentChange
 
         operation_map = {

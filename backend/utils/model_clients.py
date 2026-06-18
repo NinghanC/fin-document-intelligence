@@ -142,10 +142,75 @@ class DemoChatModel:
     def _answer(user: str) -> str:
         if "Context information:" in user:
             context = user.split("Context information:", 1)[1].split("User question:", 1)[0].strip()
-            first_line = next((line for line in context.splitlines() if line and not line.startswith("[Source")), "")
+            question = user.split("User question:", 1)[-1]
+            evidence = DemoChatModel._best_evidence_line(context, question)
             return (
                 "Based on the retrieved fund-document context, "
-                f"{first_line or 'the available evidence supports the answer'}. "
+                f"{evidence or 'the available evidence supports the answer'}. "
                 "[Source: retrieved context]"
             )
         return "The demo model needs retrieved document context to provide a grounded answer."
+
+    @staticmethod
+    def _best_evidence_line(context: str, question: str) -> str:
+        query_tokens = {
+            token
+            for token in re.findall(r"[a-zA-Z0-9]+", question.lower())
+            if len(token) >= 3 and token not in {"and", "did", "for", "the", "their", "what", "which"}
+        }
+        lines = [
+            line.strip()
+            for line in re.split(r"[\n;]+", context)
+            if line.strip() and not line.startswith("[Source")
+        ]
+        if not lines:
+            return ""
+
+        windows = []
+        for i, line in enumerate(lines):
+            windows.append(line)
+            if i + 1 < len(lines):
+                windows.append(f"{line} {lines[i + 1]}")
+
+        def score(text: str) -> tuple[float, int]:
+            tokens = set(re.findall(r"[a-zA-Z0-9]+", text.lower()))
+            overlap = len(query_tokens & tokens)
+            numeric_bonus = 1 if re.search(r"\d", text) else 0
+            risk_penalty = 1 if "risk factor" in text.lower() and "risk" not in query_tokens else 0
+            return (overlap + numeric_bonus * 0.5 - risk_penalty, len(text))
+
+        best = max(windows, key=score)
+        return DemoChatModel._focused_excerpt(best, query_tokens)
+
+    @staticmethod
+    def _focused_excerpt(text: str, query_tokens: set[str], max_chars: int = 240) -> str:
+        if len(text) <= max_chars:
+            return text
+        lowered = text.lower()
+        broad_tokens = {
+            "2021",
+            "2022",
+            "2023",
+            "annual",
+            "apple",
+            "chase",
+            "fiscal",
+            "jpmorgan",
+            "microsoft",
+            "report",
+            "reported",
+            "year",
+        }
+        focused_tokens = query_tokens - broad_tokens
+        generic_metric_tokens = {"major", "ratio", "source", "sources"}
+        preferred_tokens = focused_tokens - generic_metric_tokens
+        positions = [lowered.find(token) for token in preferred_tokens if lowered.find(token) >= 0]
+        if not positions:
+            positions = [lowered.find(token) for token in focused_tokens if lowered.find(token) >= 0]
+        if not positions:
+            positions = [lowered.find(token) for token in query_tokens if lowered.find(token) >= 0]
+        if not positions:
+            return text[:max_chars]
+        start = max(min(positions) - 60, 0)
+        end = min(start + max_chars, len(text))
+        return text[start:end].strip()

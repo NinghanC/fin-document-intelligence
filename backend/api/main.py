@@ -202,7 +202,7 @@ class QuestionRequest(BaseModel):
 class QuestionResponse(BaseModel):
     question: str
     answer: str
-    confidence: float
+    retrieval_quality: float
     intent: str
     sources: list[dict[str, Any]]
     reasoning_steps: list[str]
@@ -343,7 +343,7 @@ async def ask_question(req: QuestionRequest):
     return QuestionResponse(
         question=qa_result.question,
         answer=qa_result.answer,
-        confidence=qa_result.confidence,
+        retrieval_quality=qa_result.retrieval_quality,
         intent=qa_result.intent.value,
         sources=[
             {"content": c.content[:200], "source": c.source, "score": c.score, "type": c.retrieval_type}

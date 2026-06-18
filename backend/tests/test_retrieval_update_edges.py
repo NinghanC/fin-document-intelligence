@@ -15,6 +15,23 @@ from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import _SubprocessEmbeddings
 
 
+class KeywordEmbeddings:
+    async def aembed_query(self, text):
+        return self._embed(text)
+
+    async def aembed_documents(self, texts):
+        return [self._embed(text) for text in texts]
+
+    @staticmethod
+    def _embed(text):
+        lower = text.lower()
+        return [
+            1.0 if "apple" in lower else 0.0,
+            1.0 if "revenue" in lower else 0.0,
+            1.0 if "duration" in lower or "risk" in lower else 0.0,
+        ]
+
+
 def test_multimodal_weights_keep_unknown_doc_type_neutral():
     agent = QAAgent()
     contexts = [
@@ -138,6 +155,25 @@ async def test_graphrag_entity_linking_uses_alias_and_fuzzy_match():
 
 
 @pytest.mark.asyncio
+async def test_graphrag_entity_linking_filters_question_stopwords():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    class FakeLLM:
+        async def ainvoke(self, messages):
+            return type("Response", (), {"content": '{"entities": ["What", "JPMorgan Chase"]}'})()
+
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("JPMorgan Chase", "Organization"))
+
+    pipeline = GraphRAGPipeline(VectorStore(), graph)
+    pipeline.llm = FakeLLM()
+
+    assert await pipeline._entity_linking("What did JPMorgan Chase report?") == ["JPMorgan Chase"]
+
+
+@pytest.mark.asyncio
 async def test_entity_resolution_uses_normalized_suffix_match():
     class VectorStore:
         async def search(self, query, top_k=5):
@@ -194,43 +230,114 @@ async def test_community_summaries_are_precomputed_and_retrieved():
     assert count == 1
     assert summaries
     assert "Global Income Fund" in summaries[0]["summary"]
+    assert "Global Income Fund -[RELATED_TO]-> duration risk" in summaries[0]["relations"]
+    assert summaries[0]["algorithm"] in {"louvain", "connected_components"}
 
 
-def test_graphrag_deduplicates_by_normalized_terms_not_prefix():
+@pytest.mark.asyncio
+async def test_graphrag_skips_empty_community_summaries():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    class Graph:
+        async def get_community_summaries(self, entities, limit=3):
+            return [
+                {
+                    "community_id": "empty",
+                    "members": ["JPMorgan Chase"],
+                    "summary": "Community containing JPMorgan Chase. Relationships: No direct relationships captured.",
+                }
+            ]
+
+    pipeline = GraphRAGPipeline(VectorStore(), Graph())
+
+    assert await pipeline._community_retrieve(["JPMorgan Chase"]) == []
+
+
+@pytest.mark.asyncio
+async def test_graphrag_deduplicates_by_normalized_terms_not_prefix():
     class VectorStore:
         async def search(self, query, top_k=5):
             return []
 
     pipeline = GraphRAGPipeline(VectorStore(), KnowledgeGraphService())
+    pipeline.embeddings = KeywordEmbeddings()
     contexts = [
         GraphRAGContext("Apple reported revenue for 2023 in the filing", "vector", 0.9),
         GraphRAGContext("In the filing, revenue was reported by Apple for 2023", "subgraph", 0.8),
         GraphRAGContext("Apple reported revenue for 2024 in the filing", "vector", 0.7),
     ]
 
-    reranked = pipeline._cross_rerank(contexts, "Apple revenue")
+    reranked = await pipeline._cross_rerank(contexts, "Apple revenue")
 
     assert len(reranked) == 2
 
 
-def test_graphrag_custom_weights_are_explicit_configuration():
+@pytest.mark.asyncio
+async def test_graphrag_cross_rerank_uses_rrf_not_static_weights():
     class VectorStore:
         async def search(self, query, top_k=5):
             return []
 
-    pipeline = GraphRAGPipeline(
-        VectorStore(),
-        KnowledgeGraphService(),
-        rerank_weights={"vector": 1.0, "subgraph": 2.0, "path": 1.0, "community": 1.0},
-    )
+    pipeline = GraphRAGPipeline(VectorStore(), KnowledgeGraphService())
+    pipeline.embeddings = KeywordEmbeddings()
     contexts = [
-        GraphRAGContext("vector context", "vector", 0.9),
-        GraphRAGContext("graph context", "subgraph", 0.6),
+        GraphRAGContext("duration risk from vector", "vector", 0.1),
+        GraphRAGContext("duration risk from graph", "subgraph", 0.99),
+        GraphRAGContext("second graph result", "subgraph", 0.98),
     ]
 
-    reranked = pipeline._cross_rerank(contexts, "fund risk")
+    reranked = await pipeline._cross_rerank(contexts, "duration risk")
 
-    assert reranked[0].source_type == "subgraph"
+    assert reranked[0].source_type == "vector"
+    assert reranked[0].metadata["rrf_score"] == pytest.approx(1 / 61, abs=1e-6)
+
+
+@pytest.mark.asyncio
+async def test_graphrag_retrieve_runs_vector_and_entity_linking_concurrently():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            await asyncio.sleep(0.05)
+            return [({"content": "duration risk vector", "metadata": {}}, 0.9)]
+
+    pipeline = GraphRAGPipeline(VectorStore(), KnowledgeGraphService())
+    pipeline.embeddings = KeywordEmbeddings()
+
+    async def slow_entity_linking(query):
+        await asyncio.sleep(0.05)
+        return []
+
+    pipeline._entity_linking = slow_entity_linking
+    start = time.perf_counter()
+    contexts = await pipeline.retrieve("duration risk", top_k=3)
+    elapsed = time.perf_counter() - start
+
+    assert contexts[0].source_type == "vector"
+    assert elapsed < 0.09
+
+
+@pytest.mark.asyncio
+async def test_graphrag_retrieve_keeps_vector_results_when_graph_branch_fails():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return [({"content": "duration risk vector", "metadata": {}}, 0.9)]
+
+    pipeline = GraphRAGPipeline(VectorStore(), KnowledgeGraphService())
+    pipeline.embeddings = KeywordEmbeddings()
+
+    async def entity_linking(query):
+        return ["Global Income Fund"]
+
+    async def failing_subgraph(entities, query="", hops=2):
+        raise RuntimeError("neo4j unavailable")
+
+    pipeline._entity_linking = entity_linking
+    pipeline._subgraph_search = failing_subgraph
+
+    contexts = await pipeline.retrieve("duration risk", top_k=3)
+
+    assert [ctx.source_type for ctx in contexts] == ["vector"]
 
 
 def test_graphrag_subgraph_scores_depend_on_query_relevance():
@@ -305,6 +412,72 @@ def test_qa_intent_changes_context_limit():
     assert QAAgent._context_limit_for_intent(QueryIntent.ANALYTICAL) == 10
 
 
+def test_qa_prompt_changes_by_intent():
+    assert "one or two sentences" in QAAgent._prompt_for_intent(QueryIntent.FACTOID)
+    assert "Compare" in QAAgent._prompt_for_intent(QueryIntent.COMPARATIVE)
+    assert "ordered steps" in QAAgent._prompt_for_intent(QueryIntent.PROCEDURAL)
+
+
+@pytest.mark.asyncio
+async def test_factoid_intent_uses_tight_retrieval():
+    class VectorStore:
+        def __init__(self):
+            self.top_ks = []
+
+        async def search(self, query, top_k=5):
+            self.top_ks.append(top_k)
+            return [
+                ({"content": f"fact {i}", "source": f"s{i}", "metadata": {"doc_id": ""}}, 1.0 - i * 0.1)
+                for i in range(6)
+            ]
+
+    store = VectorStore()
+    agent = QAAgent(vector_store=store)
+    contexts = await agent._retrieve_for_intent(
+        "What is duration risk?",
+        {"queries": ["duration risk"], "entities": []},
+        QueryIntent.FACTOID,
+    )
+
+    assert store.top_ks == [6]
+    assert len(contexts) == 3
+
+
+@pytest.mark.asyncio
+async def test_comparative_intent_retrieves_per_entity():
+    class VectorStore:
+        def __init__(self):
+            self.queries = []
+
+        async def search(self, query, top_k=5):
+            self.queries.append(query)
+            return [({"content": query, "source": query, "metadata": {"doc_id": ""}}, 0.8)]
+
+    store = VectorStore()
+    agent = QAAgent(vector_store=store)
+    contexts = await agent._retrieve_for_intent(
+        "Compare Fund A and Fund B",
+        {"queries": ["compare"], "entities": ["Fund A", "Fund B"]},
+        QueryIntent.COMPARATIVE,
+    )
+
+    assert any(query.startswith("Fund A") for query in store.queries)
+    assert any(query.startswith("Fund B") for query in store.queries)
+    assert len(contexts) == 2
+
+
+def test_procedural_intent_prioritizes_policy_contexts():
+    contexts = [
+        RetrievedContext("general fund summary", "summary.md", 0.9, "vector"),
+        RetrievedContext("step one in the policy workflow", "risk_policy.md", 0.6, "vector"),
+    ]
+
+    prioritized = QAAgent._prioritize_policy_contexts(contexts)
+
+    assert prioritized[0].source == "risk_policy.md"
+    assert prioritized[0].metadata["intent_filter"] == "policy_procedure"
+
+
 @pytest.mark.asyncio
 async def test_cdc_processor_invokes_update_handler():
     calls = []
@@ -337,6 +510,20 @@ async def test_cdc_processor_invokes_update_handler():
     assert result.entities_affected == 2
 
 
+@pytest.mark.asyncio
+async def test_cdc_processor_without_update_handler_fails_explicitly():
+    processor = CDCProcessor()
+    event = CDCProcessor.from_filesystem_event("created", "fund.txt")
+
+    result = await processor.process_event(event)
+
+    assert result.success is False
+    assert "update handler is not configured" in result.error
+    assert result.version == 0
+    assert processor.get_version("fund.txt") == 0
+    assert processor.get_stats()["total_events_processed"] == 1
+
+
 def test_embedding_worker_sends_ready_signal(monkeypatch):
     import multiprocessing
     import sys
@@ -360,17 +547,68 @@ def test_embedding_worker_sends_ready_signal(monkeypatch):
 
     request_queue = multiprocessing.Queue()
     response_queue = multiprocessing.Queue()
-    request_queue.put(("shutdown", None))
+    request_queue.put({"id": "req-1", "texts": ["hello"]})
+    request_queue.put(None)
 
     _worker_process(request_queue, response_queue)
 
-    assert response_queue.get(timeout=1)[0] == "ready"
+    assert response_queue.get(timeout=1)["status"] == "ready"
+    response = response_queue.get(timeout=1)
+    assert response["id"] == "req-1"
+    assert response["embeddings"] == [[0.1, 0.2]]
+
+
+def test_start_watching_stores_observer_and_stop_watching(monkeypatch):
+    import sys
+    import types
+
+    class FakeHandler:
+        pass
+
+    class FakeObserver:
+        def __init__(self):
+            self.started = False
+            self.stopped = False
+            self.joined = False
+
+        def schedule(self, handler, directory, recursive=True):
+            self.handler = handler
+            self.directory = directory
+            self.recursive = recursive
+
+        def start(self):
+            self.started = True
+
+        def is_alive(self):
+            return False
+
+        def stop(self):
+            self.stopped = True
+
+        def join(self, timeout=None):
+            self.joined = True
+
+    fake_events = types.ModuleType("watchdog.events")
+    fake_events.FileSystemEventHandler = FakeHandler
+    fake_observers = types.ModuleType("watchdog.observers")
+    fake_observers.Observer = FakeObserver
+    monkeypatch.setitem(sys.modules, "watchdog.events", fake_events)
+    monkeypatch.setitem(sys.modules, "watchdog.observers", fake_observers)
+
+    agent = KnowledgeUpdateAgent()
+    observer = agent.start_watching("uploads")
+    agent.stop_watching()
+
+    assert observer.directory == "uploads"
+    assert observer.stopped is True
+    assert observer.joined is True
+    assert agent._observer is None
 
 
 def test_sentence_aware_chunking_does_not_split_mid_word():
     parser = DocParserAgent()
-    parser.CHUNK_SIZE = 45
-    parser.CHUNK_OVERLAP = 8
+    parser.CHUNK_MAX_TOKENS = 6
+    parser.CHUNK_OVERLAP_SENTENCES = 1
     text = "First sentence stays whole. Second sentence also stays whole. Third sentence closes."
 
     chunks = parser._chunk_texts([text], "doc", DocType.TEXT, "source.txt")
@@ -378,6 +616,30 @@ def test_sentence_aware_chunking_does_not_split_mid_word():
     assert len(chunks) >= 2
     assert all(not chunk.content.startswith("ence") for chunk in chunks)
     assert chunks[0].content.endswith(".")
+    assert chunks[1].content.startswith("First sentence stays whole.")
+    assert all(parser._approx_token_count(chunk.content) <= 12 for chunk in chunks)
+
+
+def test_chunking_prefers_financial_paragraph_boundaries():
+    parser = DocParserAgent()
+    parser.CHUNK_MAX_TOKENS = 18
+    text = (
+        "Risk Factors\n"
+        "The fund has duration risk when interest rates move quickly.\n\n"
+        "Liquidity Policy\n"
+        "The fund keeps cash buffers for expected redemption windows.\n\n"
+        "Fund Exposure\n"
+        "The portfolio includes investment grade credit and treasury futures."
+    )
+
+    chunks = parser._chunk_texts([text], "doc", DocType.MARKDOWN, "fund.md")
+
+    assert len(chunks) >= 2
+    assert "Risk Factors" in chunks[0].content
+    assert "Liquidity Policy" in chunks[1].content
+    assert any("expected redemption windows" in chunk.content for chunk in chunks)
+    assert all(not chunk.content.startswith(("dity", "emption", "windows.")) for chunk in chunks)
+    assert all(chunk.content == text[chunk.metadata["char_start"] : chunk.metadata["char_end"]].strip() for chunk in chunks)
 
 
 def test_image_prepare_downscales_large_images():
@@ -460,10 +722,14 @@ async def test_pending_graph_relations_are_hidden_until_commit(tmp_path, monkeyp
 
     assert skipped is False
     assert await graph.get_neighbors("Global Income Fund") == []
+    assert await graph.refresh_community_summaries() == 0
+    assert await graph.get_community_summaries(["Global Income Fund"]) == []
 
     ingestion_registry.commit("doc-pending")
+    await graph.refresh_community_summaries()
 
     assert await graph.get_neighbors("Global Income Fund")
+    assert await graph.get_community_summaries(["Global Income Fund"])
 
 
 @pytest.mark.asyncio

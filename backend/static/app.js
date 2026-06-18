@@ -102,7 +102,7 @@ async function sendQuestion() {
 
     appendMessage('agent', data.answer, {
       intent: data.intent,
-      confidence: data.confidence,
+      retrievalQuality: data.retrieval_quality,
       sources: data.sources,
       reasoning: data.reasoning_steps,
     });
@@ -180,10 +180,10 @@ function appendMessage(role, content, meta) {
       metaRow.appendChild(intentTag);
     }
 
-    if (meta.confidence > 0) {
+    if (meta.retrievalQuality > 0) {
       const confTag = document.createElement('span');
-      confTag.className = 'chat-tag chat-tag--confidence';
-      confTag.textContent = `Confidence ${(meta.confidence * 100).toFixed(0)}%`;
+      confTag.className = 'chat-tag chat-tag--retrieval-quality';
+      confTag.textContent = `Retrieval quality ${(meta.retrievalQuality * 100).toFixed(0)}%`;
       metaRow.appendChild(confTag);
     }
 

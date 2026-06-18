@@ -11,6 +11,7 @@ from services.graph_rag import GraphRAGPipeline
 from services.knowledge_graph import KnowledgeGraphService
 from services.multimodal import MultimodalService
 from services.vector_store import _HashEmbeddings
+from utils.model_clients import DemoChatModel
 
 
 class FakeVectorStore:
@@ -93,13 +94,54 @@ async def test_hash_embeddings_make_vector_demo_searchable():
     assert any(value != 0 for value in query)
 
 
+def test_demo_model_answer_selects_relevant_metric_line():
+    context = """\
+[Source 1: jpmorgan.pdf | Type: vector | Score: 0.95]
+Liquidity risk management overview
+Liquidity coverage ratio was 113% for JPMorgan Chase in 2023.
+"""
+    answer = DemoChatModel._answer(
+        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did JPMorgan Chase report for 2023?"
+    )
+
+    assert "Liquidity coverage ratio was 113%" in answer
+
+
+def test_demo_model_answer_focuses_long_table_excerpt_on_query_terms():
+    context = """\
+[Source 1: jpmorgan.pdf | Type: vector | Score: 0.95]
+Selected ratios and metrics Return on common equity 17 % Return on tangible common equity 21 % Return on assets 1.30 Overhead ratio 55 Loans-to-deposits ratio 55 Firm Liquidity coverage ratio (LCR) average 113 112 111.
+"""
+    answer = DemoChatModel._answer(
+        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did JPMorgan Chase report for 2023?"
+    )
+
+    assert "Liquidity coverage ratio" in answer
+    assert "113" in answer
+
+
+def test_demo_model_answer_prefers_revenue_window_over_generic_risk_line():
+    context = """\
+[Source 1: microsoft.pdf | Type: vector | Score: 0.95]
+Refer to Risk Factors in our fiscal year 2023 Form 10-K for a discussion of these factors.
+Fiscal Year 2023 Compared with Fiscal Year 2022
+Revenue increased $13.6 billion or 7% driven by growth in Intelligent Cloud and Productivity and Business Processes.
+"""
+    answer = DemoChatModel._answer(
+        f"Context information:\n{context}\n\nUser question: What did Microsoft identify as major revenue sources in fiscal 2023?"
+    )
+
+    assert "Revenue increased $13.6 billion" in answer
+
+
 @pytest.mark.asyncio
-async def test_qa_uses_graphrag_and_returns_confidence_and_sources():
+async def test_qa_uses_graphrag_and_returns_retrieval_quality_and_sources():
     agent = QAAgent(vector_store=FakeVectorStore(), knowledge_graph=FakeKnowledgeGraph())
 
     result = await agent.answer("What is the duration risk for Global Income Fund?")
 
-    assert result.confidence > 0
+    assert result.retrieval_quality > 0
+    assert result.confidence == result.retrieval_quality
     assert result.contexts
     assert any(ctx.retrieval_type == "vector" for ctx in result.contexts)
     assert any(ctx.retrieval_type == "graph" for ctx in result.contexts)
@@ -142,7 +184,23 @@ async def test_memory_knowledge_graph_supports_neighbors_and_stats():
 
 @pytest.mark.asyncio
 async def test_cdc_processor_tracks_versions_and_diff():
-    processor = CDCProcessor()
+    async def handler(change):
+        return type(
+            "Result",
+            (),
+            {
+                "change": change,
+                "vectors_added": 1,
+                "vectors_deleted": 0,
+                "entities_added": 1,
+                "entities_updated": 0,
+                "relations_added": 0,
+                "success": True,
+                "error": "",
+            },
+        )()
+
+    processor = CDCProcessor(update_handler=handler)
     event = processor.from_filesystem_event(
         "modified",
         "fund-report.txt",
@@ -154,6 +212,8 @@ async def test_cdc_processor_tracks_versions_and_diff():
 
     assert result.success
     assert result.version == 1
+    assert result.chunks_affected == 1
+    assert result.entities_affected == 1
     assert event.diff["added_count"] == 1
     assert processor.get_stats()["total_events_processed"] == 1
 

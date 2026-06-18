@@ -37,6 +37,14 @@ class DummyChromaStore:
         distances = [0.123 for _ in documents]
         return {"documents": [documents], "metadatas": [metadatas], "distances": [distances]}
 
+    def get(self, include: list[str]) -> dict:
+        if not self.added:
+            return {"documents": [], "metadatas": []}
+        return {
+            "documents": self.added[-1]["documents"],
+            "metadatas": self.added[-1]["metadatas"],
+        }
+
     def count(self) -> int:
         if not self.added:
             return 0
@@ -74,8 +82,9 @@ async def test_vector_store_add_and_search(monkeypatch):
     assert len(results) == 2
     assert results[0][0]["content"] == "Hello world"
     assert results[0][0]["source"] == "test"
-    assert results[0][1] == pytest.approx(0.877)
+    assert results[0][1] == pytest.approx(0.93235)
     assert results[0][0]["metadata"]["doc_id"] == "doc-1"
+    assert results[0][0]["metadata"]["lexical_score"] == 1.0
     assert results[1][0]["metadata"]["chunk_id"] == "doc-1#chunk-1"
 
 
@@ -94,7 +103,6 @@ async def test_vector_store_delete_by_doc_id(monkeypatch):
     service = VectorStoreService()
     service._backend = "chroma"
     service._store = DummyChromaStoreWithDelete()
-    service._stored_count = 2
     monkeypatch.setattr(service, "_embeddings", DummyEmbeddings())
 
     deleted = await service.delete_by_doc_id("doc-1")
@@ -201,4 +209,48 @@ async def test_pgvector_add_and_search(monkeypatch):
     assert len(results) == 1
     assert results[0][0]["content"] == "Global Income Fund mentions liquidity constraints."
     assert results[0][0]["source"] == "Q4_global_income_fund_risk_report.pdf"
-    assert results[0][1] == pytest.approx(0.42)
+    assert results[0][1] == pytest.approx(0.9)
+
+
+def test_lexical_boost_can_promote_exact_financial_term_match():
+    exact = VectorStoreService._score_result(
+        "liquidity coverage ratio",
+        "The firm reported a liquidity coverage ratio of 113% for 2023.",
+        {"source": "jpmorgan.pdf"},
+        vector_score=0.2,
+    )
+    fuzzy = VectorStoreService._score_result(
+        "liquidity coverage ratio",
+        "The filing discusses liquidity risk management and cash needs.",
+        {"source": "jpmorgan.pdf"},
+        vector_score=0.6,
+    )
+
+    assert exact[1] > fuzzy[1]
+    assert exact[0]["metadata"]["lexical_score"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_chroma_search_adds_lexical_candidates_outside_vector_top_k(monkeypatch):
+    class QueryOnlyReturnsWeakCandidate(DummyChromaStore):
+        def query(self, query_embeddings: list[list[float]], n_results: int, include: list[str]) -> dict:
+            return {
+                "documents": [["Generic liquidity risk overview."]],
+                "metadatas": [[self.added[-1]["metadatas"][0]]],
+                "distances": [[0.01]],
+            }
+
+    service = VectorStoreService()
+    service._backend = "chroma"
+    service._store = QueryOnlyReturnsWeakCandidate()
+    monkeypatch.setattr(service, "_embeddings", DummyEmbeddings())
+
+    chunks = [
+        DocumentChunk("Generic liquidity risk overview.", "doc-1", 0, DocType.PDF, {"source": "report.pdf"}),
+        DocumentChunk("Liquidity coverage ratio was 113% in 2023.", "doc-1", 1, DocType.PDF, {"source": "report.pdf"}),
+    ]
+    await service.add_chunks(chunks)
+
+    results = await service.search("liquidity coverage ratio", top_k=1)
+
+    assert results[0][0]["content"] == "Liquidity coverage ratio was 113% in 2023."
