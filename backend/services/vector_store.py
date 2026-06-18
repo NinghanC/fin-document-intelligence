@@ -35,27 +35,37 @@ class _SubprocessEmbeddings:
     def __init__(self):
         from services.embedding_worker import get_embedding_client
         self._client = get_embedding_client()
+        self._fallback: _HashEmbeddings | None = None
+        self._fallback_warned = False
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         if self._client is None:
-            return [[0.0] * self.dimensions for _ in texts]
+            return self._fallback_embeddings().embed_documents(texts)
         return self._client.encode(texts)
 
     def embed_query(self, text: str) -> list[float]:
         if self._client is None:
-            return [0.0] * self.dimensions
+            return self._fallback_embeddings().embed_query(text)
         return self._client.encode([text])[0]
 
     async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
         if self._client is None:
-            return [[0.0] * self.dimensions for _ in texts]
+            return self._fallback_embeddings().embed_documents(texts)
         return await self._client.aencode(texts)
 
     async def aembed_query(self, text: str) -> list[float]:
         if self._client is None:
-            return [0.0] * self.dimensions
+            return self._fallback_embeddings().embed_query(text)
         result = await self._client.aencode([text])
         return result[0]
+
+    def _fallback_embeddings(self) -> _HashEmbeddings:
+        if self._fallback is None:
+            if not self._fallback_warned:
+                logger.warning("local_embedding_worker_unavailable_using_hash_fallback")
+                self._fallback_warned = True
+            self._fallback = _HashEmbeddings(dimensions=self.dimensions)
+        return self._fallback
 
 
 class _HashEmbeddings:

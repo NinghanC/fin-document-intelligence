@@ -765,8 +765,13 @@ def test_subprocess_embedding_fallback_keeps_dimension(monkeypatch):
     embeddings = _SubprocessEmbeddings()
     embeddings._client = None
 
-    assert len(embeddings.embed_query("anything")) == embeddings.dimensions
-    assert len(embeddings.embed_documents(["a"])[0]) == embeddings.dimensions
+    query_vector = embeddings.embed_query("anything")
+    doc_vector = embeddings.embed_documents(["a"])[0]
+
+    assert len(query_vector) == embeddings.dimensions
+    assert len(doc_vector) == embeddings.dimensions
+    assert any(value != 0.0 for value in query_vector)
+    assert any(value != 0.0 for value in doc_vector)
 
 
 def test_cdc_diff_preserves_order_and_duplicates():

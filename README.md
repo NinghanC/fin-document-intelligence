@@ -493,6 +493,7 @@ Operational hardening in the public prototype:
 
 - Batch uploads are processed with bounded concurrency (`BATCH_UPLOAD_CONCURRENCY`) instead of a sequential loop.
 - Retrieval, parsing, graph, and storage fallbacks emit structured warning logs instead of silently swallowing exceptions.
+- Local embedding worker failures fall back to deterministic hash embeddings with a warning, rather than writing all-zero vectors.
 - Rate-limit buckets and request metrics default to in-memory state for local demos, with an optional PostgreSQL-backed mode via `API_STATE_BACKEND=postgres` and `API_STATE_DSN`.
 - The QA LangGraph includes conditional routing: low-quality answers are retried once with stronger evidence focus, then converted into an insufficient-evidence response instead of pretending to answer.
 
