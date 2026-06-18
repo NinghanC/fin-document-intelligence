@@ -55,6 +55,14 @@ FinSight Assistant uses a four-agent pipeline:
 - `QAAgent` answers questions with vector and graph retrieval context.
 - `KnowledgeUpdateAgent` handles changed documents and incremental refresh logic.
 
+The QA layer also supports finance metapath retrieval for typed graph patterns such as sector exposure, compliance chains, supplier paths, and geography-linked reasoning.
+
+Quick links:
+
+- [Finance Metapath Retrieval](#finance-metapath-retrieval)
+- [API](#api)
+- [Configuration](#configuration)
+
 The architecture is designed around two complementary knowledge representations:
 
 - Vector representation for semantic recall.
@@ -68,7 +76,7 @@ This hybrid design is more useful for financial workflows than a pure vector-sea
 +------------------------------------------------+
 | User Interface Layer                           |
 | Web UI (SPA, 3 tabs)                           |
-| REST API (FastAPI, 7 endpoints)                |
+| REST API (FastAPI, 8 endpoints)                |
 | Swagger / OpenAPI documentation                |
 +------------------------+-----------------------+
                          |
@@ -523,6 +531,7 @@ FinSight combines both:
 | `POST` | `/api/qa/ask` | Ask a question using hybrid retrieval |
 | `GET` | `/api/admin/stats` | Read vector store and graph statistics |
 | `POST` | `/api/admin/update` | Trigger a document update workflow |
+| `POST` | `/api/admin/cdc/events` | Process a normalized CDC event |
 | `GET` | `/api/health` | Health check |
 
 Example:
@@ -555,6 +564,12 @@ Important variables:
 | `CHROMA_PORT` | ChromaDB port when `CHROMA_MODE=http` |
 | `PGVECTOR_DSN` | PGVector connection string |
 | `KAFKA_BOOTSTRAP_SERVERS` | Kafka bootstrap server |
+| `AUTH_ENABLED` | Enable API-key authentication for protected endpoints |
+| `API_KEY` | Shared API key used when `AUTH_ENABLED=true` |
+| `MAX_UPLOAD_SIZE_MB` | Per-file upload size limit |
+| `BATCH_UPLOAD_CONCURRENCY` | Concurrency limit for batch uploads |
+| `API_STATE_BACKEND` | `memory` or `postgres` for rate-limit and request metrics |
+| `API_STATE_DSN` | PostgreSQL connection string for API state when enabled |
 | `UPLOAD_DIR` | File upload directory |
 
 The intended model-provider targets are:
@@ -578,6 +593,10 @@ OPENAI_API_KEY=your-key
 OPENAI_BASE_URL=your-provider-endpoint
 OPENAI_MODEL=your-model
 EMBEDDING_MODEL=text-embedding-3-small
+AUTH_ENABLED=false
+API_KEY=change-me-for-protected-deployments
+MAX_UPLOAD_SIZE_MB=10
+BATCH_UPLOAD_CONCURRENCY=4
 ```
 
 When running with Docker Compose, use service hostnames:
@@ -655,7 +674,7 @@ docker compose up -d neo4j chromadb pgvector zookeeper kafka
 
 Implemented:
 
-- FastAPI backend with upload, QA, stats, update, and health endpoints.
+- FastAPI backend with upload, batch upload, QA, stats, update, CDC event, and health endpoints.
 - Static browser UI for Q&A, uploads, and dashboard stats.
 - Four-agent architecture.
 - LangGraph workflows for ingestion, QA, and update.
@@ -670,7 +689,6 @@ Implemented:
 Partially implemented:
 
 - Production-grade vector indexing, retrieval tuning, and observability.
-- GraphRAG integration into the main QA path.
 - Fine-grained incremental updates.
 - OCR and vision robustness for scanned financial PDFs.
 - Provider-specific deployment templates.
@@ -683,7 +701,7 @@ Known gaps:
 - No malware scanning or file sandboxing for uploads.
 - No full observability stack.
 - No formal audit log for regulated workflows.
-- Minimal automated tests.
+- Automated tests cover core paths, but broader integration coverage is still limited.
 - ChromaDB calls are isolated through sync wrappers for local runtime stability.
 
 ## Production Hardening Roadmap
