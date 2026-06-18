@@ -13,6 +13,7 @@ from services.embedding_worker import _worker_process
 from services.graph_rag import GraphRAGContext, GraphRAGPipeline
 from services.ingestion_registry import ingestion_registry
 from services.knowledge_graph import KnowledgeGraphService
+from services.metapaths import FINANCIAL_METAPATHS, MetapathRouter, validate_all_metapaths
 from services.vector_store import _SubprocessEmbeddings
 
 
@@ -31,6 +32,57 @@ class KeywordEmbeddings:
             1.0 if "revenue" in lower else 0.0,
             1.0 if "duration" in lower or "risk" in lower else 0.0,
         ]
+
+
+def test_financial_metapaths_validate_and_route_by_domain_terms():
+    validate_all_metapaths()
+    router = MetapathRouter()
+
+    selected = router.select("Which sectors is Global Income Fund exposed to?", ["Global Income Fund"])
+
+    assert selected[0].name == "sector_exposure"
+    assert FINANCIAL_METAPATHS["shared_sector"].steps[1].direction == "in"
+
+
+@pytest.mark.asyncio
+async def test_memory_graph_traverses_finance_metapath_with_direction():
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Global Income Fund", "Fund"))
+    await graph.upsert_entity(Entity("Microsoft", "Company"))
+    await graph.upsert_entity(Entity("Apple Inc.", "Company"))
+    await graph.upsert_entity(Entity("Technology", "Sector"))
+    await graph.add_relation(Relation("Global Income Fund", "holds", "Microsoft"))
+    await graph.add_relation(Relation("Microsoft", "belongs_to", "Technology"))
+    await graph.add_relation(Relation("Apple Inc.", "belongs_to", "Technology"))
+
+    sector_results = await graph.traverse_metapath(["Global Income Fund"], FINANCIAL_METAPATHS["sector_exposure"])
+    shared_results = await graph.traverse_metapath(["Microsoft"], FINANCIAL_METAPATHS["shared_sector"])
+
+    assert sector_results[0].end_entity == "Technology"
+    assert ("Global Income Fund", "HOLDS", "Microsoft") in sector_results[0].path
+    assert any(result.end_entity == "Apple Inc." for result in shared_results)
+
+
+@pytest.mark.asyncio
+async def test_graphrag_metapath_search_adds_explainable_context():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Global Income Fund", "Fund"))
+    await graph.upsert_entity(Entity("Microsoft", "Company"))
+    await graph.upsert_entity(Entity("Technology", "Sector"))
+    await graph.add_relation(Relation("Global Income Fund", "holds", "Microsoft"))
+    await graph.add_relation(Relation("Microsoft", "belongs_to", "Technology"))
+
+    pipeline = GraphRAGPipeline(VectorStore(), graph)
+    contexts = await pipeline._metapath_search("Which sector exposure does Global Income Fund have?", ["Global Income Fund"])
+
+    assert contexts
+    assert contexts[0].source_type == "metapath"
+    assert contexts[0].metadata["metapath"] == "sector_exposure"
+    assert "Global Income Fund -[HOLDS]-> Microsoft" in contexts[0].content
 
 
 def test_multimodal_weights_keep_unknown_doc_type_neutral():

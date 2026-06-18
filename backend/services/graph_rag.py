@@ -28,6 +28,7 @@ import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from services.knowledge_graph import KnowledgeGraphService
+from services.metapaths import MetapathRouter, MetapathSpec
 from services.vector_store import VectorStoreService, _create_embeddings
 from utils.model_clients import create_chat_model
 
@@ -37,7 +38,7 @@ logger = structlog.get_logger("finsight.graphrag")
 @dataclass
 class GraphRAGContext:
     content: str
-    source_type: str  # "vector" | "subgraph" | "path" | "community"
+    source_type: str  # "vector" | "subgraph" | "path" | "community" | "metapath"
     score: float
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -103,6 +104,7 @@ class GraphRAGPipeline:
         self.llm = create_chat_model()
         self.embeddings = _create_embeddings()
         self.alias_table = {**DEFAULT_ALIAS_TABLE, **(alias_table or {})}
+        self.metapath_router = MetapathRouter()
 
     async def retrieve(self, query: str, top_k: int = 10) -> list[GraphRAGContext]:
         """
@@ -128,6 +130,7 @@ class GraphRAGPipeline:
             self._subgraph_search(entities, query=query),
             self._path_search(entities),
             self._community_retrieve(entities),
+            self._metapath_search(query, entities),
             return_exceptions=True,
         )
         for branch_result in branch_results:
@@ -325,11 +328,56 @@ class GraphRAGPipeline:
             ))
         return contexts
 
+    # Step 6: Finance metapath retrieval
+    async def _metapath_search(self, query: str, entities: list[str]) -> list[GraphRAGContext]:
+        traverse_metapath = getattr(self.knowledge_graph, "traverse_metapath", None)
+        if not callable(traverse_metapath):
+            return []
+        selected_metapaths = self.metapath_router.select(query, entities)
+        if not selected_metapaths:
+            return []
+
+        contexts: list[GraphRAGContext] = []
+        traversal_results = await asyncio.gather(
+            *(
+                self.knowledge_graph.traverse_metapath(
+                    start_entities=entities,
+                    metapath=metapath,
+                    limit=10,
+                )
+                for metapath in selected_metapaths
+            ),
+            return_exceptions=True,
+        )
+        for metapath, result in zip(selected_metapaths, traversal_results, strict=False):
+            if isinstance(result, BaseException):
+                logger.warning("metapath_search_failed", metapath=metapath.name, error=str(result))
+                continue
+            for path_result in result:
+                content = (
+                    f"Metapath {path_result.metapath_name}: {path_result.evidence}. "
+                    f"This supports {metapath.description}"
+                )
+                contexts.append(GraphRAGContext(
+                    content=content,
+                    source_type="metapath",
+                    score=self._metapath_score(query, metapath, path_result.evidence, path_result.score),
+                    metadata={
+                        "metapath": path_result.metapath_name,
+                        "path": list(path_result.path),
+                        "start_entity": path_result.start_entity,
+                        "end_entity": path_result.end_entity,
+                        "description": metapath.description,
+                        "score_method": "metapath_coverage_lexical",
+                    },
+                ))
+        return contexts
+
     @staticmethod
     def _is_context_list(value: object) -> TypeGuard[list[GraphRAGContext]]:
         return isinstance(value, list)
 
-    # Step 6: cross-rerank
+    # Step 7: cross-rerank
     async def _cross_rerank(self, contexts: list[GraphRAGContext], query: str) -> list[GraphRAGContext]:
         """
         Cross-rerank with query relevance inside each branch and RRF across branches.
@@ -366,7 +414,7 @@ class GraphRAGPipeline:
     @staticmethod
     def _reciprocal_rank_fusion(contexts: list[GraphRAGContext], rrf_k: int = 60) -> list[GraphRAGContext]:
         fused: dict[str, tuple[GraphRAGContext, float, list[str]]] = {}
-        for source_type in ("vector", "subgraph", "path", "community"):
+        for source_type in ("vector", "subgraph", "path", "community", "metapath"):
             branch = sorted(
                 [ctx for ctx in contexts if ctx.source_type == source_type],
                 key=lambda item: item.score,
@@ -486,6 +534,12 @@ class GraphRAGPipeline:
         member_overlap = len(set(entities) & members) / len(set(entities))
         lexical_score = cls._lexical_similarity(" ".join(entities), str(summary.get("summary", "")))
         score = (member_overlap * 0.7) + (lexical_score * 0.3)
+        return round(min(score, 1.0), 4)
+
+    @classmethod
+    def _metapath_score(cls, query: str, metapath: MetapathSpec, evidence: str, path_score: float) -> float:
+        lexical_score = cls._lexical_similarity(query, f"{metapath.name} {metapath.description} {evidence}")
+        score = (path_score * 0.6) + (lexical_score * 0.4)
         return round(min(score, 1.0), 4)
 
     @staticmethod

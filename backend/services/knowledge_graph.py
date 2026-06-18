@@ -23,6 +23,7 @@ import structlog
 from agents.knowledge_extract_agent import Entity, Relation
 from config import settings
 from services.ingestion_registry import ingestion_registry
+from services.metapaths import MetapathResult, MetapathSpec
 
 WRITE_CYPHER_PATTERN = re.compile(r"\b(CREATE|MERGE|DELETE|SET|REMOVE|DROP|LOAD|CALL\s+dbms)\b", re.IGNORECASE)
 
@@ -248,6 +249,60 @@ class KnowledgeGraphService:
         """
         return await self.execute_cypher(cypher, {"name": entity_name})
 
+    async def traverse_metapath(
+        self,
+        start_entities: list[str],
+        metapath: MetapathSpec,
+        limit: int = 20,
+    ) -> list[MetapathResult]:
+        """Traverse a typed finance metapath from candidate start entities."""
+        if not start_entities:
+            return []
+        if not self._driver:
+            return self._memory_traverse_metapath(start_entities, metapath, limit=limit)
+
+        rel_types = [self._sanitize_rel_type(step.relation) for step in metapath.steps]
+        direction_parts = []
+        for index, rel_type in enumerate(rel_types):
+            if metapath.steps[index].direction == "out":
+                direction_parts.append(f"-[r{index}:{rel_type}]->")
+            else:
+                direction_parts.append(f"<-[r{index}:{rel_type}]-")
+
+        node_parts = ["(n0:Entity)"]
+        for index, _step in enumerate(metapath.steps, start=1):
+            node_parts.append(f"(n{index}:Entity)")
+
+        match_parts: list[str] = []
+        for index, relation_part in enumerate(direction_parts):
+            match_parts.append(f"{node_parts[index]}{relation_part}{node_parts[index + 1]}")
+        match_clause = ",".join(match_parts)
+        type_checks = [f"coalesce(n{index}.type, '') = $type_{index}" for index in range(len(metapath.steps) + 1)]
+        params: dict[str, Any] = {
+            "start_entities": start_entities,
+            "limit": limit,
+            "metapath": metapath.name,
+        }
+        params["type_0"] = metapath.steps[0].from_type
+        for index, step in enumerate(metapath.steps, start=1):
+            params[f"type_{index}"] = step.to_type
+
+        rel_returns = ", ".join(
+            f"[n{index}.name, type(r{index}), n{index + 1}.name]" for index in range(len(metapath.steps))
+        )
+        cypher = f"""
+        MATCH {match_clause}
+        WHERE n0.name IN $start_entities
+          AND {' AND '.join(type_checks)}
+        RETURN
+          n0.name AS start_entity,
+          n{len(metapath.steps)}.name AS end_entity,
+          [{rel_returns}] AS path
+        LIMIT $limit
+        """
+        records = await self.execute_cypher(cypher, params)
+        return [self._metapath_result_from_record(metapath, record) for record in records]
+
     async def search_entities(self, keyword: str, limit: int = 20) -> list[dict]:
         """Fuzzy-search entities"""
         if not self._driver:
@@ -424,6 +479,76 @@ class KnowledgeGraphService:
             if not frontier:
                 break
         return records
+
+    def _memory_traverse_metapath(
+        self,
+        start_entities: list[str],
+        metapath: MetapathSpec,
+        limit: int = 20,
+    ) -> list[MetapathResult]:
+        visible_entities = self._visible_memory_entities()
+        visible_relations = self._visible_memory_relations()
+        results: list[MetapathResult] = []
+
+        for start_entity in start_entities:
+            start_record = visible_entities.get(start_entity)
+            if not start_record or start_record.get("type") != metapath.steps[0].from_type:
+                continue
+            states: list[tuple[str, list[tuple[str, str, str]]]] = [(start_entity, [])]
+            for step in metapath.steps:
+                next_states: list[tuple[str, list[tuple[str, str, str]]]] = []
+                for current_name, path in states:
+                    current_record = visible_entities.get(current_name)
+                    if not current_record or current_record.get("type") != step.from_type:
+                        continue
+                    for rel in visible_relations:
+                        if rel["relation"] != self._sanitize_rel_type(step.relation):
+                            continue
+                        source = rel["head"] if step.direction == "out" else rel["tail"]
+                        target = rel["tail"] if step.direction == "out" else rel["head"]
+                        if source != current_name:
+                            continue
+                        target_record = visible_entities.get(target)
+                        if not target_record or target_record.get("type") != step.to_type:
+                            continue
+                        next_states.append((target, [*path, (source, rel["relation"], target)]))
+                states = next_states
+                if not states:
+                    break
+            for end_entity, path in states:
+                results.append(self._metapath_result_from_path(metapath, start_entity, end_entity, path))
+                if len(results) >= limit:
+                    return results
+        return results
+
+    @classmethod
+    def _metapath_result_from_record(cls, metapath: MetapathSpec, record: dict[str, Any]) -> MetapathResult:
+        path = tuple((str(head), str(rel), str(tail)) for head, rel, tail in record.get("path", []))
+        return cls._metapath_result_from_path(
+            metapath=metapath,
+            start_entity=str(record.get("start_entity", "")),
+            end_entity=str(record.get("end_entity", "")),
+            path=path,
+        )
+
+    @staticmethod
+    def _metapath_result_from_path(
+        metapath: MetapathSpec,
+        start_entity: str,
+        end_entity: str,
+        path: list[tuple[str, str, str]] | tuple[tuple[str, str, str], ...],
+    ) -> MetapathResult:
+        path_tuple = tuple(path)
+        evidence = "; ".join(f"{head} -[{relation}]-> {tail}" for head, relation, tail in path_tuple)
+        score = round(min(1.0, len(path_tuple) / max(len(metapath.steps), 1)), 4)
+        return MetapathResult(
+            metapath_name=metapath.name,
+            start_entity=start_entity,
+            end_entity=end_entity,
+            path=path_tuple,
+            evidence=evidence,
+            score=score,
+        )
 
     @staticmethod
     def _source_prefixes(source: str) -> tuple[str, str, str]:

@@ -13,6 +13,26 @@ def load_graphrag_eval_module():
     return module
 
 
+def load_metapath_eval_module():
+    module_path = Path(__file__).resolve().parents[2] / "bench" / "run_metapath_eval.py"
+    spec = importlib.util.spec_from_file_location("run_metapath_eval", module_path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_real_holdings_eval_module():
+    module_path = Path(__file__).resolve().parents[2] / "bench" / "run_real_holdings_eval.py"
+    spec = importlib.util.spec_from_file_location("run_real_holdings_eval", module_path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_weighted_grid_reports_best_branch_boost():
     module = load_graphrag_eval_module()
     questions = [
@@ -54,3 +74,31 @@ def test_public_demo_questions_are_labeled():
         assert item["question"]
         assert item["expected_source"]
         assert item["expected_terms"]
+
+
+def test_metapath_eval_dataset_reaches_expected_paths():
+    module = load_metapath_eval_module()
+    dataset_path = Path(__file__).resolve().parents[2] / "bench" / "metapath_dataset.json"
+    dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
+
+    result = module.asyncio.run(module._evaluate(dataset))
+
+    assert result["total"] >= 16
+    assert result["router_hit_rate"] == 1.0
+    assert result["path_hit_rate"] == 1.0
+    assert result["average_path_recall"] == 1.0
+
+
+def test_real_holdings_eval_dataset_reaches_expected_paths():
+    module = load_real_holdings_eval_module()
+    root = Path(__file__).resolve().parents[2] / "bench" / "real_holdings"
+
+    rows = module._read_csv(root / "holdings_sample.csv")
+    questions = module._read_questions(root / "questions.json")
+    result = module.asyncio.run(module._evaluate(rows, questions))
+
+    assert result["holdings_rows"] >= 20
+    assert result["questions"] >= 8
+    assert result["router_hit_rate"] == 1.0
+    assert result["path_hit_rate"] == 1.0
+    assert result["average_path_recall"] == 1.0

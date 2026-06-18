@@ -365,12 +365,55 @@ The intent classifier supports:
 
 Hybrid retrieval merges vector, subgraph, path, and cached community-summary contexts. Each branch is scored against the query, then fused with reciprocal rank fusion so vector and graph scores do not need to pretend they live on the same scale.
 
+#### Finance Metapath Retrieval
+
+The graph retrieval layer also supports finance-domain metapaths. A metapath is a typed relationship pattern that reflects how an analyst would reason over a financial graph. For example:
+
+```text
+sector_exposure:
+Fund -> holds -> Company -> belongs_to -> Sector
+
+shared_sector:
+Company -> belongs_to -> Sector <- belongs_to <- Company
+
+compliance_chain:
+Fund -> holds -> Company -> subject_to -> Regulation
+```
+
+The prototype keeps these paths explicit instead of asking a model to invent them. This is intentional:
+
+- Financial relationship patterns are domain knowledge, not arbitrary graph walks.
+- Typed paths make the retrieval result explainable: the answer can show which path supported the evidence.
+- Rule-based routing is easier to audit than a learned router when the labeled retrieval set is still small.
+- Learned routing or HAN-style metapath attention only makes sense after the graph ontology is stable and a labeled retrieval benchmark exists.
+
+Implementation-wise, `MetapathRouter` selects candidate paths from query terms such as `sector`, `geographic`, `supplier`, `technology`, or `compliance`. `KnowledgeGraphService.traverse_metapath()` then walks the typed path in Neo4j or the in-memory graph fallback. Matching paths are added to GraphRAG as `source_type="metapath"` contexts and fused with vector, subgraph, path, and community evidence through RRF.
+
+Example:
+
+```text
+Question:
+Which sectors is Global Income Fund exposed to?
+
+Selected metapath:
+sector_exposure
+
+Traversal:
+Global Income Fund -[HOLDS]-> Microsoft
+Microsoft -[BELONGS_TO]-> Technology
+
+Retrieved evidence:
+Metapath sector_exposure: Global Income Fund -[HOLDS]-> Microsoft; Microsoft -[BELONGS_TO]-> Technology.
+```
+
+This is deliberately a domain-guided retrieval feature, not a trained HAN model. The next step before learned metapath attention is to add labeled finance questions with expected source documents and expected graph paths, then report source hit rate, path hit rate, and recall@k.
+
 #### Fusion Strategy Trade-off
 
 The default application path uses RRF instead of static source weights. This is deliberate:
 
 - Vector similarity, graph traversal scores, path scores, and community-summary scores are not naturally calibrated to the same numeric scale.
-- RRF only depends on rank position inside each retrieval branch, so it is less brittle when one branch has noisier scores.
+- RRF only depends on rank position inside each retrieval branch, so it is less brittle when one branch has noisier scores, including metapath results.
 - The trade-off is that RRF cannot express a learned preference such as "graph evidence is more reliable for relationship questions" unless a second-stage reranker or branch boost is added.
 
 For that reason, the benchmark keeps a `weighted-grid` mode as an experiment, not as the production default. It reranks the API-returned vector/graph source branches with candidate branch boosts and reports whether any boost improves expected-source hit rate. This is useful for deciding whether weighted fusion is worth implementing deeper in the retrieval stack. It should not be presented as learned production weighting until it is run against a labeled retrieval set with candidate-level outputs.
@@ -381,7 +424,27 @@ The `bench/` directory includes a small evaluation scaffold for expected-source 
 python bench/run_graphrag_eval.py --mode rrf
 python bench/run_graphrag_eval.py --mode weighted-grid
 python bench/run_graphrag_eval.py --mode both
+python bench/run_metapath_eval.py
+python bench/run_real_holdings_eval.py
 ```
+
+`bench/metapath_dataset.json` is a larger synthetic finance graph benchmark for metapath retrieval. It contains 27 entities, 37 typed relationships, and 16 labeled questions covering sector exposure, geographic risk, supply-chain risk, technology dependency, compliance scope, shared-sector discovery, management overlap, and subsidiary-chain traversal. The benchmark is synthetic on purpose: it gives deterministic coverage for graph behavior that is hard to guarantee from a small set of public filings.
+
+`bench/real_holdings/` adds a second benchmark shaped like public 13F holdings data. The committed sample contains 26 manager-holding rows across Berkshire Hathaway, BlackRock, and Vanguard style portfolios, plus sector and region enrichment. It is intentionally small and offline so CI can run it deterministically, while still testing graph paths that look like real public holdings analysis:
+
+```text
+Portfolio -> holds -> Company -> belongs_to -> Sector
+Portfolio -> holds -> Company -> located_in -> Region
+Company -> belongs_to -> Sector <- belongs_to <- Company
+```
+
+`run_metapath_eval.py` and `run_real_holdings_eval.py` build in-memory graphs, run `MetapathRouter`, traverse the expected typed paths, and report:
+
+- router hit rate
+- path hit rate
+- average end-entity recall
+
+This complements the public-document API benchmark. The public filings test answer/source grounding; the synthetic metapath benchmark tests full graph-pattern coverage; the real-holdings benchmark tests whether those patterns work on a public-finance data shape.
 
 The default public-demo questions use only publicly available annual reports and 10-K filings:
 

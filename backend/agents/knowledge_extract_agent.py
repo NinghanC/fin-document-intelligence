@@ -41,8 +41,8 @@ Return strictly in the following JSON format:
 }
 
 Notes:
-- Entity types include: Person, Organization, Location, Product, Technology, Concept, Event, Time
-- Relationship types include: belongs_to, works_at, located_in, developed_by, related_to, part_of, uses, depends_on
+- Entity types include: Person, Organization, Company, Fund, Sector, Region, Supplier, Regulation, RiskFactor, Location, Product, Technology, Concept, Event, Time
+- Relationship types include: holds, belongs_to, works_at, located_in, developed_by, related_to, part_of, uses, depends_on, subject_to, regulated_by, owns
 - confidence is a floating-point number between 0 and 1
 - Return only JSON without any other text
 """

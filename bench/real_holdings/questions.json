@@ -1,0 +1,50 @@
+[
+  {
+    "question": "Which sectors is Berkshire Hathaway 13F Portfolio exposed to through its public holdings sample?",
+    "start_entities": ["Berkshire Hathaway 13F Portfolio"],
+    "expected_metapath": "sector_exposure",
+    "expected_end_entities": ["Technology", "Financials", "Consumer Staples", "Energy"]
+  },
+  {
+    "question": "Which sectors is BlackRock 13F Portfolio exposed to through the holdings sample?",
+    "start_entities": ["BlackRock 13F Portfolio"],
+    "expected_metapath": "sector_exposure",
+    "expected_end_entities": ["Technology", "Semiconductors", "Consumer Discretionary", "Communication Services", "Financials"]
+  },
+  {
+    "question": "Which sectors is Vanguard 13F Portfolio exposed to through the holdings sample?",
+    "start_entities": ["Vanguard 13F Portfolio"],
+    "expected_metapath": "sector_exposure",
+    "expected_end_entities": ["Technology", "Semiconductors", "Consumer Discretionary", "Communication Services", "Health Care", "Financials"]
+  },
+  {
+    "question": "Which country exposure does Berkshire Hathaway 13F Portfolio have in this holdings sample?",
+    "start_entities": ["Berkshire Hathaway 13F Portfolio"],
+    "expected_metapath": "geographic_risk",
+    "expected_end_entities": ["United States"]
+  },
+  {
+    "question": "Which country exposure does BlackRock 13F Portfolio have in this holdings sample?",
+    "start_entities": ["BlackRock 13F Portfolio"],
+    "expected_metapath": "geographic_risk",
+    "expected_end_entities": ["United States"]
+  },
+  {
+    "question": "Which peers share the same sector as Apple Inc.?",
+    "start_entities": ["Apple Inc."],
+    "expected_metapath": "shared_sector",
+    "expected_end_entities": ["Microsoft"]
+  },
+  {
+    "question": "Which companies are in the same sector as Bank of America?",
+    "start_entities": ["Bank of America"],
+    "expected_metapath": "shared_sector",
+    "expected_end_entities": ["American Express", "Moody's", "Berkshire Hathaway", "JPMorgan Chase"]
+  },
+  {
+    "question": "Which companies share semiconductor sector exposure with Nvidia?",
+    "start_entities": ["Nvidia"],
+    "expected_metapath": "shared_sector",
+    "expected_end_entities": ["Broadcom"]
+  }
+]

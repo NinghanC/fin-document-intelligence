@@ -1,0 +1,169 @@
+{
+  "entities": [
+    {"name": "Global Income Fund", "type": "Fund"},
+    {"name": "Strategic Growth Fund", "type": "Fund"},
+    {"name": "Defensive Credit Fund", "type": "Fund"},
+    {"name": "Microsoft", "type": "Company"},
+    {"name": "Apple Inc.", "type": "Company"},
+    {"name": "JPMorgan Chase", "type": "Company"},
+    {"name": "Visa", "type": "Company"},
+    {"name": "Nvidia", "type": "Company"},
+    {"name": "ASML", "type": "Company"},
+    {"name": "First Data Services", "type": "Company"},
+    {"name": "Merchant Services Europe", "type": "Company"},
+    {"name": "CloudOps Europe", "type": "Supplier"},
+    {"name": "Taiwan Semiconductor Manufacturing", "type": "Supplier"},
+    {"name": "Core Banking Platform", "type": "Technology"},
+    {"name": "Azure", "type": "Technology"},
+    {"name": "GPU Acceleration", "type": "Technology"},
+    {"name": "Technology", "type": "Sector"},
+    {"name": "Financials", "type": "Sector"},
+    {"name": "Semiconductors", "type": "Sector"},
+    {"name": "United States", "type": "Region"},
+    {"name": "Europe", "type": "Region"},
+    {"name": "Netherlands", "type": "Region"},
+    {"name": "Basel III", "type": "Regulation"},
+    {"name": "SEC Liquidity Rule", "type": "Regulation"},
+    {"name": "Maria Chen", "type": "Person"},
+    {"name": "David Morgan", "type": "Person"},
+    {"name": "Liquidity Risk", "type": "RiskFactor"},
+    {"name": "Supply Chain Risk", "type": "RiskFactor"}
+  ],
+  "relations": [
+    {"head": "Global Income Fund", "relation": "holds", "tail": "Microsoft"},
+    {"head": "Global Income Fund", "relation": "holds", "tail": "JPMorgan Chase"},
+    {"head": "Global Income Fund", "relation": "holds", "tail": "Visa"},
+    {"head": "Strategic Growth Fund", "relation": "holds", "tail": "Apple Inc."},
+    {"head": "Strategic Growth Fund", "relation": "holds", "tail": "Nvidia"},
+    {"head": "Strategic Growth Fund", "relation": "holds", "tail": "ASML"},
+    {"head": "Defensive Credit Fund", "relation": "holds", "tail": "JPMorgan Chase"},
+    {"head": "Defensive Credit Fund", "relation": "holds", "tail": "Visa"},
+    {"head": "Microsoft", "relation": "belongs_to", "tail": "Technology"},
+    {"head": "Apple Inc.", "relation": "belongs_to", "tail": "Technology"},
+    {"head": "JPMorgan Chase", "relation": "belongs_to", "tail": "Financials"},
+    {"head": "Visa", "relation": "belongs_to", "tail": "Financials"},
+    {"head": "Nvidia", "relation": "belongs_to", "tail": "Semiconductors"},
+    {"head": "ASML", "relation": "belongs_to", "tail": "Semiconductors"},
+    {"head": "Microsoft", "relation": "located_in", "tail": "United States"},
+    {"head": "Apple Inc.", "relation": "located_in", "tail": "United States"},
+    {"head": "JPMorgan Chase", "relation": "located_in", "tail": "United States"},
+    {"head": "Visa", "relation": "located_in", "tail": "United States"},
+    {"head": "Nvidia", "relation": "located_in", "tail": "United States"},
+    {"head": "ASML", "relation": "located_in", "tail": "Netherlands"},
+    {"head": "Microsoft", "relation": "uses", "tail": "Azure"},
+    {"head": "JPMorgan Chase", "relation": "uses", "tail": "Core Banking Platform"},
+    {"head": "Nvidia", "relation": "uses", "tail": "GPU Acceleration"},
+    {"head": "Microsoft", "relation": "depends_on", "tail": "CloudOps Europe"},
+    {"head": "Apple Inc.", "relation": "depends_on", "tail": "Taiwan Semiconductor Manufacturing"},
+    {"head": "Nvidia", "relation": "depends_on", "tail": "Taiwan Semiconductor Manufacturing"},
+    {"head": "ASML", "relation": "depends_on", "tail": "CloudOps Europe"},
+    {"head": "JPMorgan Chase", "relation": "subject_to", "tail": "Basel III"},
+    {"head": "Visa", "relation": "subject_to", "tail": "SEC Liquidity Rule"},
+    {"head": "Global Income Fund", "relation": "related_to", "tail": "Liquidity Risk"},
+    {"head": "Strategic Growth Fund", "relation": "related_to", "tail": "Supply Chain Risk"},
+    {"head": "Maria Chen", "relation": "works_at", "tail": "Microsoft"},
+    {"head": "Maria Chen", "relation": "works_at", "tail": "Apple Inc."},
+    {"head": "David Morgan", "relation": "works_at", "tail": "JPMorgan Chase"},
+    {"head": "David Morgan", "relation": "works_at", "tail": "Visa"},
+    {"head": "JPMorgan Chase", "relation": "owns", "tail": "First Data Services"},
+    {"head": "First Data Services", "relation": "owns", "tail": "Merchant Services Europe"}
+  ],
+  "questions": [
+    {
+      "question": "Which sectors is Global Income Fund exposed to?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "sector_exposure",
+      "expected_end_entities": ["Technology", "Financials"]
+    },
+    {
+      "question": "Which sectors is Strategic Growth Fund concentrated in?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "sector_exposure",
+      "expected_end_entities": ["Technology", "Semiconductors"]
+    },
+    {
+      "question": "What geographic regions does Strategic Growth Fund touch through holdings?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "geographic_risk",
+      "expected_end_entities": ["United States", "Netherlands"]
+    },
+    {
+      "question": "Which country exposure does Global Income Fund have?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "geographic_risk",
+      "expected_end_entities": ["United States"]
+    },
+    {
+      "question": "Which suppliers create supply chain dependencies for Strategic Growth Fund?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "supply_chain_risk",
+      "expected_end_entities": ["Taiwan Semiconductor Manufacturing", "CloudOps Europe"]
+    },
+    {
+      "question": "Which vendor dependencies affect Global Income Fund?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "supply_chain_risk",
+      "expected_end_entities": ["CloudOps Europe"]
+    },
+    {
+      "question": "Which cloud or technology platforms affect Global Income Fund?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "technology_risk",
+      "expected_end_entities": ["Azure", "Core Banking Platform"]
+    },
+    {
+      "question": "Which technology risk is connected to Strategic Growth Fund?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "technology_risk",
+      "expected_end_entities": ["GPU Acceleration"]
+    },
+    {
+      "question": "Which regulations apply to Defensive Credit Fund holdings?",
+      "start_entities": ["Defensive Credit Fund"],
+      "expected_metapath": "compliance_chain",
+      "expected_end_entities": ["Basel III", "SEC Liquidity Rule"]
+    },
+    {
+      "question": "Which compliance rules are Global Income Fund holdings subject to?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "compliance_chain",
+      "expected_end_entities": ["Basel III", "SEC Liquidity Rule"]
+    },
+    {
+      "question": "Which peers share the same sector as Microsoft?",
+      "start_entities": ["Microsoft"],
+      "expected_metapath": "shared_sector",
+      "expected_end_entities": ["Apple Inc."]
+    },
+    {
+      "question": "Which companies are in the same sector as JPMorgan Chase?",
+      "start_entities": ["JPMorgan Chase"],
+      "expected_metapath": "shared_sector",
+      "expected_end_entities": ["Visa"]
+    },
+    {
+      "question": "Which companies share semiconductor sector exposure with Nvidia?",
+      "start_entities": ["Nvidia"],
+      "expected_metapath": "shared_sector",
+      "expected_end_entities": ["ASML"]
+    },
+    {
+      "question": "Which companies have management overlap with Microsoft?",
+      "start_entities": ["Microsoft"],
+      "expected_metapath": "management_overlap",
+      "expected_end_entities": ["Apple Inc."]
+    },
+    {
+      "question": "Which companies have board or executive overlap with JPMorgan Chase?",
+      "start_entities": ["JPMorgan Chase"],
+      "expected_metapath": "management_overlap",
+      "expected_end_entities": ["Visa"]
+    },
+    {
+      "question": "What subsidiary ownership chain starts from JPMorgan Chase?",
+      "start_entities": ["JPMorgan Chase"],
+      "expected_metapath": "subsidiary_chain",
+      "expected_end_entities": ["Merchant Services Europe"]
+    }
+  ]
+}

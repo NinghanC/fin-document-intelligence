@@ -1,0 +1,27 @@
+manager,period,ticker,company,sector,region
+Berkshire Hathaway 13F Portfolio,2023-12-31,AAPL,Apple Inc.,Technology,United States
+Berkshire Hathaway 13F Portfolio,2023-12-31,BAC,Bank of America,Financials,United States
+Berkshire Hathaway 13F Portfolio,2023-12-31,AXP,American Express,Financials,United States
+Berkshire Hathaway 13F Portfolio,2023-12-31,KO,Coca-Cola,Consumer Staples,United States
+Berkshire Hathaway 13F Portfolio,2023-12-31,CVX,Chevron,Energy,United States
+Berkshire Hathaway 13F Portfolio,2023-12-31,OXY,Occidental Petroleum,Energy,United States
+Berkshire Hathaway 13F Portfolio,2023-12-31,KHC,Kraft Heinz,Consumer Staples,United States
+Berkshire Hathaway 13F Portfolio,2023-12-31,MCO,Moody's,Financials,United States
+BlackRock 13F Portfolio,2023-12-31,AAPL,Apple Inc.,Technology,United States
+BlackRock 13F Portfolio,2023-12-31,MSFT,Microsoft,Technology,United States
+BlackRock 13F Portfolio,2023-12-31,NVDA,Nvidia,Semiconductors,United States
+BlackRock 13F Portfolio,2023-12-31,AVGO,Broadcom,Semiconductors,United States
+BlackRock 13F Portfolio,2023-12-31,AMZN,Amazon,Consumer Discretionary,United States
+BlackRock 13F Portfolio,2023-12-31,META,Meta Platforms,Communication Services,United States
+BlackRock 13F Portfolio,2023-12-31,GOOGL,Alphabet,Communication Services,United States
+BlackRock 13F Portfolio,2023-12-31,BRK.B,Berkshire Hathaway,Financials,United States
+BlackRock 13F Portfolio,2023-12-31,JPM,JPMorgan Chase,Financials,United States
+Vanguard 13F Portfolio,2023-12-31,AAPL,Apple Inc.,Technology,United States
+Vanguard 13F Portfolio,2023-12-31,MSFT,Microsoft,Technology,United States
+Vanguard 13F Portfolio,2023-12-31,NVDA,Nvidia,Semiconductors,United States
+Vanguard 13F Portfolio,2023-12-31,AVGO,Broadcom,Semiconductors,United States
+Vanguard 13F Portfolio,2023-12-31,AMZN,Amazon,Consumer Discretionary,United States
+Vanguard 13F Portfolio,2023-12-31,GOOGL,Alphabet,Communication Services,United States
+Vanguard 13F Portfolio,2023-12-31,META,Meta Platforms,Communication Services,United States
+Vanguard 13F Portfolio,2023-12-31,LLY,Eli Lilly,Health Care,United States
+Vanguard 13F Portfolio,2023-12-31,JPM,JPMorgan Chase,Financials,United States
