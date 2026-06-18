@@ -9,7 +9,9 @@ from fastapi.testclient import TestClient
 import api.main as api_main
 from agents.doc_parser_agent import DocType, DocumentChunk
 from agents.knowledge_extract_agent import Entity, ExtractionResult, Relation
+from config.settings import Settings
 from orchestrator.graph import _build_ingest_graph
+from services.ingestion_registry import ingestion_registry
 from services.knowledge_graph import KnowledgeGraphService
 
 
@@ -78,11 +80,36 @@ async def test_read_only_cypher_rejects_writes():
 
 def test_relation_type_sanitization_blocks_injection():
     assert KnowledgeGraphService._sanitize_rel_type("related_to") == "RELATED_TO"
+    assert KnowledgeGraphService._sanitize_rel_type("holds") == "HOLDS"
     assert KnowledgeGraphService._sanitize_rel_type("REL] DELETE n //") == "RELATED_TO"
+    assert KnowledgeGraphService._sanitize_rel_type("looks_safe_but_unknown") == "RELATED_TO"
+
+
+def test_settings_enable_auth_by_default():
+    settings = Settings(_env_file=None)
+
+    assert settings.auth_enabled is True
+    assert settings.api_key == ""
 
 
 @pytest.mark.asyncio
-async def test_parallel_ingest_store_node_runs_vector_and_graph_work(tmp_path):
+async def test_enabled_auth_without_configured_key_rejects_requests(monkeypatch):
+    monkeypatch.setattr(api_main.settings, "auth_enabled", True)
+    monkeypatch.setattr(api_main.settings, "api_key", "")
+
+    with pytest.raises(HTTPException) as exc:
+        await api_main.require_api_key("anything")
+
+    assert exc.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_parallel_ingest_store_node_runs_vector_and_graph_work(tmp_path, monkeypatch):
+    source = tmp_path / "fund.txt"
+    source.write_text("Global Income Fund duration risk", encoding="utf-8")
+    monkeypatch.setattr("services.ingestion_registry.settings.upload_dir", str(tmp_path))
+    ingestion_registry._records = {}
+
     class Parser:
         async def parse_batch(self, file_paths):
             return [
@@ -135,7 +162,7 @@ async def test_parallel_ingest_store_node_runs_vector_and_graph_work(tmp_path):
     workflow = _build_ingest_graph(Parser(), Extractor(), VectorStore(), graph_service)
 
     start = time.perf_counter()
-    result = await workflow.ainvoke({"file_paths": [str(tmp_path / "fund.txt")]})
+    result = await workflow.ainvoke({"file_paths": [str(source)]})
     elapsed = time.perf_counter() - start
 
     assert result["vectors_stored"] == 1

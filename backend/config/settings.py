@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o"
     embedding_model: str = "text-embedding-3-small"
     embedding_provider: str = "auto"  # auto | openai | local | hash
+    community_summary_provider: str = "structured"  # structured | llm
 
     # Neo4j
     neo4j_uri: str = "bolt://localhost:7687"
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
     chroma_mode: str = "local"  # local | http
     chroma_host: str = "localhost"
     chroma_port: int = 8000
+    chroma_lexical_scan_limit: int = 1000
     pgvector_dsn: str = "postgresql://postgres:postgres@localhost:5432/knowledge"
     disable_local_embeddings: bool = False
 
@@ -36,7 +38,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8080
     api_key: str = ""
-    auth_enabled: bool = False
+    auth_enabled: bool = True
     allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
@@ -44,6 +46,7 @@ class Settings(BaseSettings):
     batch_upload_concurrency: int = 4
     api_state_backend: str = "memory"  # memory | postgres
     api_state_dsn: str = "postgresql://postgres:postgres@localhost:5432/knowledge"
+    pdf_vision_concurrency: int = 2
 
     # Document Store
     upload_dir: str = "./uploads"

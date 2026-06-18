@@ -55,7 +55,7 @@ FinSight Assistant uses a four-agent pipeline:
 - `QAAgent` answers questions with vector and graph retrieval context.
 - `KnowledgeUpdateAgent` handles changed documents and incremental refresh logic.
 
-The QA layer also supports finance metapath retrieval for typed graph patterns such as sector exposure, compliance chains, supplier paths, and geography-linked reasoning.
+The QA layer also supports finance metapath retrieval for typed graph patterns such as sector exposure, compliance chains, supplier paths, and geography-linked evidence.
 
 Quick links:
 
@@ -66,7 +66,7 @@ Quick links:
 The architecture is designed around two complementary knowledge representations:
 
 - Vector representation for semantic recall.
-- Knowledge graph representation for entities, relationships, and multi-hop reasoning.
+- Knowledge graph representation for entities, relationships, shortest paths, typed metapath traversal, and rule-based multi-hop inference.
 
 This hybrid design is more useful for financial workflows than a pure vector-search system because many questions depend on structured relationships, not just semantic similarity.
 
@@ -111,7 +111,7 @@ This hybrid design is more useful for financial workflows than a pure vector-sea
 | KnowledgeExtractAgent  | | KnowledgeGraphService | | Neo4j                |
 | QAAgent                | | GraphRAGPipeline      | | Kafka                |
 | KnowledgeUpdateAgent   | | CDCProcessor          | | EmbeddingWorker      |
-|                        | | MultimodalService     | | (subprocess)         |
+|                        | | MultimodalReasoning   | | (subprocess)         |
 +------------------------+ +-----------------------+ +----------------------+
 ```
 
@@ -148,7 +148,7 @@ backend/
     knowledge_graph.py           Neo4j abstraction
     graph_rag.py                 GraphRAG retrieval pipeline
     cdc_processor.py             CDC event normalization and diffing
-    multimodal.py                Cross-modal embedding/reranking helper
+    multimodal.py                Query-time table and image reasoning helper
     embedding_worker.py          Isolated embedding subprocess
   static/
     index.html                   Browser UI
@@ -338,7 +338,7 @@ The system maintains two storage paths:
 | Storage | Purpose |
 | --- | --- |
 | Vector store | Semantic similarity search over document chunks |
-| Neo4j graph | Entity relationships and multi-hop reasoning |
+| Neo4j graph | Entity relationships, shortest paths, typed metapath traversal, and rule-based inference |
 
 The current vector-store implementation is intentionally defensive but functional for a local prototype:
 
@@ -371,7 +371,27 @@ The intent classifier supports:
 - `procedural`
 - `exploratory`
 
-Hybrid retrieval merges vector, subgraph, path, and cached community-summary contexts. Each branch is scored against the query, then fused with reciprocal rank fusion so vector and graph scores do not need to pretend they live on the same scale.
+Hybrid retrieval merges vector, subgraph, shortest-path, metapath, inferred-fact, and cached community-summary contexts. Each branch is scored against the query, then fused with reciprocal rank fusion so vector and graph scores do not need to pretend they live on the same scale.
+
+The graph layer now separates three levels of graph evidence:
+
+- traversal evidence: nearby entities and shortest paths
+- metapath evidence: typed analyst-style paths such as `Fund -> holds -> Company -> belongs_to -> Sector`
+- logical inference evidence: named rules derive explicit propositions from typed multi-hop paths
+
+For example, if the graph contains `Global Income Fund -[HOLDS]-> Microsoft` and `Microsoft -[BELONGS_TO]-> Technology`, the `fund_sector_exposure` rule derives: `Global Income Fund has inferred sector exposure to Technology.` The derived fact keeps the original path as provenance, so the answer can cite both the conclusion and the evidence chain.
+
+This is rule-based domain inference, not an unconstrained symbolic theorem prover. It is intentionally narrow: only approved financial inference rules are applied, and every inferred fact must be backed by a concrete graph path.
+
+Non-text inputs now have a separate multimodal reasoning path in addition to ordinary vector retrieval:
+
+- tables are parsed into headers, rows, matched columns, matched rows, and numeric facts, then emitted as `retrieval_type="multimodal"` evidence
+- image chunks can be re-opened at question time and sent to the configured vision-capable provider model when a real provider key is available
+- local/offline mode falls back to reasoning over the parser's OCR and vision-description output, so CI remains deterministic
+
+This means multimodal evidence is no longer just a fixed modality weight on text embeddings. It becomes a first-class QA context with its own reasoning mode, source metadata, and retrieval-quality contribution.
+
+Community summaries are computed offline during graph refresh, not during question answering. By default, `COMMUNITY_SUMMARY_PROVIDER=structured` produces deterministic summaries from detected community members and relationships. Setting `COMMUNITY_SUMMARY_PROVIDER=llm` uses the configured provider-backed chat model to write richer summaries at ingestion/update time, then stores those summaries for fast query-time lookup. If `llm` is requested without a real provider key, the system falls back to structured summaries rather than pretending the offline demo model is a production summarizer.
 
 #### Finance Metapath Retrieval
 
@@ -395,7 +415,7 @@ The prototype keeps these paths explicit instead of asking a model to invent the
 - Rule-based routing is easier to audit than a learned router when the labeled retrieval set is still small.
 - Learned routing or HAN-style metapath attention only makes sense after the graph ontology is stable and a labeled retrieval benchmark exists.
 
-Implementation-wise, `MetapathRouter` selects candidate paths from query terms such as `sector`, `geographic`, `supplier`, `technology`, or `compliance`. `KnowledgeGraphService.traverse_metapath()` then walks the typed path in Neo4j or the in-memory graph fallback. Matching paths are added to GraphRAG as `source_type="metapath"` contexts and fused with vector, subgraph, path, and community evidence through RRF.
+Implementation-wise, `MetapathRouter` selects candidate paths from query terms such as `sector`, `geographic`, `supplier`, `technology`, or `compliance`. `KnowledgeGraphService.traverse_metapath()` then walks the typed path in Neo4j or the in-memory graph fallback. `LogicalInferenceEngine` applies approved inference rules on top of those typed paths and emits `source_type="inference"` contexts. Matching paths and inferred facts are fused with vector, subgraph, path, and community evidence through RRF.
 
 Example:
 
@@ -412,6 +432,9 @@ Microsoft -[BELONGS_TO]-> Technology
 
 Retrieved evidence:
 Metapath sector_exposure: Global Income Fund -[HOLDS]-> Microsoft; Microsoft -[BELONGS_TO]-> Technology.
+
+Inferred fact:
+Inference rule fund_sector_exposure ... Therefore: Global Income Fund has inferred sector exposure to Technology.
 ```
 
 This is deliberately a domain-guided retrieval feature, not a trained HAN model. The next step before learned metapath attention is to add labeled finance questions with expected source documents and expected graph paths, then report source hit rate, path hit rate, and recall@k.
@@ -426,7 +449,7 @@ The default application path uses RRF instead of static source weights. This is 
 
 For that reason, the benchmark keeps a `weighted-grid` mode as an experiment, not as the production default. It reranks the API-returned vector/graph source branches with candidate branch boosts and reports whether any boost improves expected-source hit rate. This is useful for deciding whether weighted fusion is worth implementing deeper in the retrieval stack. It should not be presented as learned production weighting until it is run against a labeled retrieval set with candidate-level outputs.
 
-The `bench/` directory includes a small evaluation scaffold for expected-source checks and future recall@k reporting on a labeled retrieval set:
+The `bench/` directory includes evaluation scaffolds for expected-source checks, retrieval hit rate, and future recall@k reporting on a labeled retrieval set:
 
 ```bash
 python bench/run_graphrag_eval.py --mode rrf
@@ -454,6 +477,8 @@ Company -> belongs_to -> Sector <- belongs_to <- Company
 
 This complements the public-document API benchmark. The public filings test answer/source grounding; the synthetic metapath benchmark tests full graph-pattern coverage; the real-holdings benchmark tests whether those patterns work on a public-finance data shape.
 
+For the public-document API benchmark, the primary metric is retrieval hit rate: expected source plus expected evidence terms must appear in returned source snippets. Answer-term matching is reported separately as an answer smoke metric. This avoids circularly tuning the benchmark to the deterministic demo answer model.
+
 #### Optional Live LLM Smoke Tests
 
 Most automated tests use the deterministic demo model so CI can run without provider credentials. That proves orchestration, parsing, retrieval, graph traversal, and API behavior, but it does not prove a real LLM follows the prompts.
@@ -471,6 +496,28 @@ RUN_LIVE_LLM_TESTS=1 OPENAI_API_KEY=... pytest -m live_llm backend/tests/test_li
 ```
 
 These are smoke tests, not a full evaluation set. They are intentionally separate from the default test suite because live models add cost, latency, and occasional nondeterminism.
+
+#### Optional Live Infrastructure Smoke Tests
+
+The default tests also use in-memory graph storage and deterministic embedding fallbacks where appropriate, so they can run without Docker. To verify that the real infrastructure paths work, the repo includes optional `live_infra` tests for:
+
+- Neo4j entity and relationship writes/reads
+- ChromaDB HTTP add/search
+- PGVector add/search
+
+Start the infrastructure first:
+
+```bash
+docker compose up -d neo4j chromadb pgvector
+```
+
+Then run:
+
+```bash
+RUN_LIVE_INFRA_TESTS=1 pytest -m live_infra backend/tests/test_live_infra_smoke.py
+```
+
+These tests intentionally fail when the services are not reachable. That makes them useful for validating the real Docker-backed path instead of silently passing through memory fallbacks.
 
 The default public-demo questions use only publicly available annual reports and 10-K filings:
 
@@ -513,6 +560,7 @@ changes -> process -> conditional retry -> END
 - file hash comparison
 - batch processing
 - one retry pass through LangGraph
+- failed-ingestion dead-letter visibility in `/api/admin/stats`
 
 `CDCProcessor` also provides helpers for:
 
@@ -574,6 +622,7 @@ Important variables:
 | `OPENAI_MODEL` | Chat model or deployment name |
 | `EMBEDDING_MODEL` | Embedding model name |
 | `EMBEDDING_PROVIDER` | `auto`, `openai`, `local`, or `hash`; `auto` uses provider embeddings when configured and demo-safe hash embeddings otherwise |
+| `COMMUNITY_SUMMARY_PROVIDER` | `structured` for deterministic offline summaries or `llm` for provider-backed summaries computed during graph refresh |
 | `NEO4J_URI` | Neo4j Bolt URI |
 | `NEO4J_USER` | Neo4j username |
 | `NEO4J_PASSWORD` | Neo4j password |
@@ -581,12 +630,14 @@ Important variables:
 | `CHROMA_MODE` | `local` for embedded persistence or `http` for Docker-hosted ChromaDB |
 | `CHROMA_HOST` | ChromaDB host when `CHROMA_MODE=http` |
 | `CHROMA_PORT` | ChromaDB port when `CHROMA_MODE=http` |
+| `CHROMA_LEXICAL_SCAN_LIMIT` | Maximum documents scanned by the Chroma lexical fallback in local/demo mode |
 | `PGVECTOR_DSN` | PGVector connection string |
 | `KAFKA_BOOTSTRAP_SERVERS` | Kafka bootstrap server |
 | `AUTH_ENABLED` | Enable API-key authentication for protected endpoints |
 | `API_KEY` | Shared API key used when `AUTH_ENABLED=true` |
 | `MAX_UPLOAD_SIZE_MB` | Per-file upload size limit |
 | `BATCH_UPLOAD_CONCURRENCY` | Concurrency limit for batch uploads |
+| `PDF_VISION_CONCURRENCY` | Concurrency limit for scanned-PDF vision fallback pages |
 | `API_STATE_BACKEND` | `memory` or `postgres` for rate-limit and request metrics |
 | `API_STATE_DSN` | PostgreSQL connection string for API state when enabled |
 | `UPLOAD_DIR` | File upload directory |
@@ -612,11 +663,13 @@ OPENAI_API_KEY=your-key
 OPENAI_BASE_URL=your-provider-endpoint
 OPENAI_MODEL=your-model
 EMBEDDING_MODEL=text-embedding-3-small
-AUTH_ENABLED=false
-API_KEY=change-me-for-protected-deployments
+AUTH_ENABLED=true
+API_KEY=replace-with-a-random-local-secret
 MAX_UPLOAD_SIZE_MB=10
 BATCH_UPLOAD_CONCURRENCY=4
 ```
+
+Protected endpoints require the `X-API-Key` header when `AUTH_ENABLED=true`. For a throwaway localhost-only demo, you can explicitly set `AUTH_ENABLED=false`, but the application default is protected.
 
 When running with Docker Compose, use service hostnames:
 
@@ -708,15 +761,16 @@ Implemented:
 Partially implemented:
 
 - Production-grade vector indexing, retrieval tuning, and observability.
+- Chroma lexical fallback is bounded for demo safety; large corpora should use PGVector plus an indexed lexical retrieval path.
 - Fine-grained incremental updates.
-- OCR and vision robustness for scanned financial PDFs.
+- OCR and vision fallback for scanned financial PDFs, including bounded per-page concurrency.
 - Provider-specific deployment templates.
 
 Known gaps:
 
-- No authentication or role-based access control.
+- API-key authentication is available for protected deployments, but there is no role-based access control.
 - No tenant isolation.
-- No background job queue for ingestion.
+- No background job queue for ingestion; failed ingestions are exposed as dead letters for operator visibility.
 - No malware scanning or file sandboxing for uploads.
 - No full observability stack.
 - No formal audit log for regulated workflows.

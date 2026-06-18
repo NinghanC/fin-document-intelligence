@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from agents.doc_parser_agent import DocParserAgent, DocType, DocumentChunk
+from agents.doc_parser_agent import DocParserAgent, DocType
 from agents.knowledge_extract_agent import KnowledgeExtractAgent
 from agents.qa_agent import QAAgent
 from services.cdc_processor import CDCProcessor
@@ -96,36 +96,36 @@ async def test_hash_embeddings_make_vector_demo_searchable():
 
 def test_demo_model_answer_selects_relevant_metric_line():
     context = """\
-[Source 1: jpmorgan.pdf | Type: vector | Score: 0.95]
+[Source 1: northstar_bank.pdf | Type: vector | Score: 0.95]
 Liquidity risk management overview
-Liquidity coverage ratio was 113% for JPMorgan Chase in 2023.
+Liquidity coverage ratio was 113% for Northstar Bank in 2023.
 """
     answer = DemoChatModel._answer(
-        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did JPMorgan Chase report for 2023?"
+        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did Northstar Bank report for 2023?"
     )
 
-    assert "JPMorgan Chase reported an average liquidity coverage ratio of 113% for 2023." in answer
+    assert "Northstar Bank reported an average liquidity coverage ratio of 113% for 2023." in answer
 
 
 def test_demo_model_answer_focuses_long_table_excerpt_on_query_terms():
     context = """\
-[Source 1: jpmorgan.pdf | Type: vector | Score: 0.95]
+[Source 1: northstar_bank.pdf | Type: vector | Score: 0.95]
 Selected ratios and metrics Return on common equity 17 % Return on tangible common equity 21 % Return on assets 1.30 Overhead ratio 55 Loans-to-deposits ratio 55 Firm Liquidity coverage ratio (LCR) average 113 112 111.
 """
     answer = DemoChatModel._answer(
-        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did JPMorgan Chase report for 2023?"
+        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did Northstar Bank report for 2023?"
     )
 
-    assert "JPMorgan Chase reported an average liquidity coverage ratio of 113% for 2023." in answer
+    assert "Northstar Bank reported an average liquidity coverage ratio of 113% for 2023." in answer
 
 
 def test_demo_model_says_insufficient_when_metric_context_is_truncated():
     context = """\
-[Source 1: jpmorgan.pdf | Type: vector | Score: 0.95]
+[Source 1: northstar_bank.pdf | Type: vector | Score: 0.95]
 Selected ratios and metrics Return on common equity 17 % Return on assets 1.30 Overhead ratio 55 59 59 Lo.
 """
     answer = DemoChatModel._answer(
-        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did JPMorgan Chase report for 2023?"
+        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did Northstar Bank report for 2023?"
     )
 
     assert "insufficient" in answer.lower()
@@ -133,20 +133,20 @@ Selected ratios and metrics Return on common equity 17 % Return on assets 1.30 O
 
 def test_demo_model_answer_prefers_revenue_window_over_generic_risk_line():
     context = """\
-[Source 1: microsoft.pdf | Type: vector | Score: 0.95]
+[Source 1: cloudware.pdf | Type: vector | Score: 0.95]
 Refer to Risk Factors in our fiscal year 2023 Form 10-K for a discussion of these factors.
 Fiscal Year 2023 Compared with Fiscal Year 2022
 Revenue increased $13.6 billion or 7% driven by growth in Intelligent Cloud and Productivity and Business Processes.
 """
     answer = DemoChatModel._answer(
-        f"Context information:\n{context}\n\nUser question: What did Microsoft identify as major revenue sources in fiscal 2023?"
+        f"Context information:\n{context}\n\nUser question: What did Cloudware identify as major revenue sources in fiscal 2023?"
     )
 
-    assert "Microsoft reported that fiscal 2023 revenue increased $13.6 billion" in answer
+    assert "Cloudware reported that fiscal 2023 revenue increased $13.6 billion" in answer
     assert "Intelligent Cloud and Productivity and Business Processes" in answer
 
 
-def test_demo_model_formats_microsoft_segment_revenue_table():
+def test_demo_model_formats_segment_revenue_table():
     context = """\
 [Source 1: microsoft.pdf | Type: vector | Score: 0.95]
 Revenue
@@ -156,7 +156,7 @@ More Personal Computing   54,734    59,941    54,445
 Total  $ 211,915   $ 198,270   $ 168,088
 """
     answer = DemoChatModel._answer(
-        f"Context information:\n{context}\n\nUser question: What were Microsoft's reported revenue segments in fiscal 2023?"
+        f"Context information:\n{context}\n\nUser question: What were Cloudware's reported revenue segments in fiscal 2023?"
     )
 
     assert "Productivity and Business Processes $69,274 million" in answer
@@ -164,35 +164,35 @@ Total  $ 211,915   $ 198,270   $ 168,088
     assert "More Personal Computing $54,734 million" in answer
 
 
-def test_demo_model_formats_apple_deferred_revenue_answer():
+def test_demo_model_formats_deferred_revenue_answer():
     context = """\
-[Source 1: apple.pdf | Type: vector | Score: 0.95]
+[Source 1: apex_devices.pdf | Type: vector | Score: 0.95]
 Total net sales include $8.2 billion of revenue recognized in 2023 that was included in deferred revenue as of September 24, 2022.
 """
     answer = DemoChatModel._answer(
         "Context information:\n"
         f"{context}\n\n"
-        "User question: How much revenue did Apple recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
+        "User question: How much revenue did Apex Devices recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
     )
 
-    assert "Apple recognized $8.2 billion of revenue in 2023" in answer
+    assert "Apex Devices recognized $8.2 billion of revenue in 2023" in answer
 
 
-def test_demo_model_prefers_apple_deferred_revenue_over_distractors():
+def test_demo_model_prefers_deferred_revenue_over_distractors():
     context = """\
-[Source 1: microsoft.pdf | Type: vector | Score: 1.00]
-Our Microsoft Cloud revenue was $111.6 billion in fiscal year 2023.
+[Source 1: distractor.pdf | Type: vector | Score: 1.00]
+Our cloud revenue was $111.6 billion in fiscal year 2023.
 
-[Source 2: apple.pdf | Type: vector | Score: 0.95]
+[Source 2: apex_devices.pdf | Type: vector | Score: 0.95]
 Total net sales include $8.2 billion of revenue recognized in 2023 that was included in deferred revenue as of September 24, 2022, $7.5 billion of revenue recognized in 2022.
 """
     answer = DemoChatModel._answer(
         "Context information:\n"
         f"{context}\n\n"
-        "User question: How much revenue did Apple recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
+        "User question: How much revenue did Apex Devices recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
     )
 
-    assert "Apple recognized $8.2 billion of revenue in 2023" in answer
+    assert "Apex Devices recognized $8.2 billion of revenue in 2023" in answer
 
 
 def test_demo_model_classifies_how_much_as_factoid():
@@ -295,17 +295,31 @@ async def test_doc_parser_text_and_extractor_demo_model(tmp_path):
     assert any(entity.name == "Global Income Fund" for item in extraction for entity in item.entities)
 
 
-def test_multimodal_weighted_rerank_uses_modality_weights():
+@pytest.mark.asyncio
+async def test_multimodal_service_reasons_over_serialized_table():
     service = MultimodalService()
-    text_chunk = DocumentChunk("text result", "doc", 0, DocType.TEXT, {})
-    image_chunk = DocumentChunk("image result", "doc", 1, DocType.IMAGE, {})
+    context = type(
+        "Context",
+        (),
+        {
+            "content": (
+                "Headers: Fund | Sector | Exposure\n"
+                "Fund: Global Income Fund | Sector: Technology | Exposure: 42%\n"
+                "Fund: Credit Fund | Sector: Financials | Exposure: 18%"
+            ),
+            "source": "exposures.csv",
+            "score": 0.6,
+            "metadata": {"doc_type": "table", "source": "exposures.csv"},
+        },
+    )()
 
-    results = service.weighted_rerank([(image_chunk, 1.0), (text_chunk, 0.9)])
+    results = await service.reason_over_contexts("What technology exposure does Global Income Fund have?", [context])
 
-    assert results[0].modality == "text"
-    assert results[0].score == pytest.approx(0.9)
-    assert results[1].modality == "image"
-    assert results[1].score == pytest.approx(0.85)
+    assert results
+    assert results[0].modality == "table"
+    assert results[0].metadata["reasoning_mode"] == "structured_table_reasoning"
+    assert "Technology" in results[0].content
+    assert "42%" in results[0].content
 
 
 def test_embedding_worker_disabled_path(monkeypatch):

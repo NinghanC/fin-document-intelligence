@@ -20,25 +20,28 @@ import httpx
 GRID_VALUES = [0.8, 1.0, 1.2, 1.4]
 
 
-def _hit(item: dict[str, Any], response: dict[str, Any]) -> bool:
+def _retrieval_hit(item: dict[str, Any], response: dict[str, Any]) -> bool:
     source_blob = " ".join(str(source) for source in response.get("sources", []))
-    answer_blob = str(response.get("answer", ""))
     terms = item.get("expected_terms", [])
-    answer_terms = item.get("expected_answer_terms", [])
     return item["expected_source"] in source_blob and all(
-        term.lower() in (answer_blob + source_blob).lower()
+        term.lower() in source_blob.lower()
         for term in terms
-    ) and all(term.lower() in answer_blob.lower() for term in answer_terms)
+    )
 
 
-def _source_hit(item: dict[str, Any], sources: list[dict[str, Any]], answer: str = "") -> bool:
+def _answer_hit(item: dict[str, Any], response: dict[str, Any]) -> bool:
+    answer_blob = str(response.get("answer", ""))
+    answer_terms = item.get("expected_answer_terms", [])
+    return all(term.lower() in answer_blob.lower() for term in answer_terms)
+
+
+def _source_hit(item: dict[str, Any], sources: list[dict[str, Any]]) -> bool:
     source_blob = " ".join(str(source) for source in sources)
     terms = item.get("expected_terms", [])
-    answer_terms = item.get("expected_answer_terms", [])
     return item["expected_source"] in source_blob and all(
-        term.lower() in (answer + source_blob).lower()
+        term.lower() in source_blob.lower()
         for term in terms
-    ) and all(term.lower() in answer.lower() for term in answer_terms)
+    )
 
 
 def _weighted_sources(
@@ -61,13 +64,18 @@ def _weight_grid() -> list[dict[str, float]]:
 
 
 def _evaluate_rrf(questions: list[dict[str, Any]], responses: list[dict[str, Any]]) -> dict[str, Any]:
-    hits = sum(int(_hit(item, response)) for item, response in zip(questions, responses, strict=False))
+    retrieval_hits = sum(int(_retrieval_hit(item, response)) for item, response in zip(questions, responses, strict=False))
+    answer_hits = sum(int(_answer_hit(item, response)) for item, response in zip(questions, responses, strict=False))
     return {
         "mode": "rrf",
         "fusion": "reciprocal_rank_fusion",
+        "primary_metric": "retrieval_hit_rate",
+        "note": "Retrieval hit rate checks expected source and evidence terms in returned sources only; answer hit rate is reported separately to avoid tuning the benchmark to the demo answer model.",
         "total": len(questions),
-        "expected_source_hits": hits,
-        "hit_rate": round(hits / max(len(questions), 1), 3),
+        "expected_source_hits": retrieval_hits,
+        "hit_rate": round(retrieval_hits / max(len(questions), 1), 3),
+        "answer_hits": answer_hits,
+        "answer_hit_rate": round(answer_hits / max(len(questions), 1), 3),
     }
 
 
@@ -81,7 +89,7 @@ def _evaluate_weighted_grid(
         hits = 0
         for item, response in zip(questions, responses, strict=False):
             reranked = _weighted_sources(response.get("sources", []), weights, top_k)
-            hits += int(_source_hit(item, reranked, str(response.get("answer", ""))))
+            hits += int(_source_hit(item, reranked))
         candidates.append({
             "weights": weights,
             "expected_source_hits": hits,

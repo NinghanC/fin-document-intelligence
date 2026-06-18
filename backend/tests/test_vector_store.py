@@ -37,12 +37,12 @@ class DummyChromaStore:
         distances = [0.123 for _ in documents]
         return {"documents": [documents], "metadatas": [metadatas], "distances": [distances]}
 
-    def get(self, include: list[str]) -> dict:
+    def get(self, include: list[str], limit: int | None = None) -> dict:
         if not self.added:
             return {"documents": [], "metadatas": []}
         return {
-            "documents": self.added[-1]["documents"],
-            "metadatas": self.added[-1]["metadatas"],
+            "documents": self.added[-1]["documents"][:limit],
+            "metadatas": self.added[-1]["metadatas"][:limit],
         }
 
     def count(self) -> int:
@@ -230,6 +230,19 @@ def test_lexical_boost_can_promote_exact_financial_term_match():
     assert exact[0]["metadata"]["lexical_score"] == 1.0
 
 
+def test_hash_embeddings_are_not_degenerate_for_short_texts():
+    embeddings = vector_store_module._HashEmbeddings(dimensions=64)
+    exact = embeddings.embed_query("AI")
+    same = embeddings.embed_query("AI")
+    different = embeddings.embed_query("duration")
+
+    exact_similarity = sum(a * b for a, b in zip(exact, same, strict=False))
+    different_similarity = sum(a * b for a, b in zip(exact, different, strict=False))
+
+    assert any(value != 0.0 for value in exact)
+    assert exact_similarity > different_similarity
+
+
 @pytest.mark.asyncio
 async def test_chroma_search_adds_lexical_candidates_outside_vector_top_k(monkeypatch):
     class QueryOnlyReturnsWeakCandidate(DummyChromaStore):
@@ -254,3 +267,30 @@ async def test_chroma_search_adds_lexical_candidates_outside_vector_top_k(monkey
     results = await service.search("liquidity coverage ratio", top_k=1)
 
     assert results[0][0]["content"] == "Liquidity coverage ratio was 113% in 2023."
+
+
+@pytest.mark.asyncio
+async def test_chroma_lexical_scan_uses_configured_limit(monkeypatch):
+    class StoreWithLimit(DummyChromaStore):
+        def __init__(self):
+            super().__init__()
+            self.limit = None
+
+        def get(self, include: list[str], limit: int | None = None) -> dict:
+            self.limit = limit
+            return super().get(include, limit)
+
+    service = VectorStoreService()
+    service._backend = "chroma"
+    service._store = StoreWithLimit()
+    monkeypatch.setattr(service, "_embeddings", DummyEmbeddings())
+    monkeypatch.setattr(vector_store_module.settings, "chroma_lexical_scan_limit", 1)
+
+    chunks = [
+        DocumentChunk("Liquidity coverage ratio was 113% in 2023.", "doc-1", 0, DocType.PDF, {"source": "report.pdf"}),
+        DocumentChunk("Another liquidity coverage ratio row.", "doc-1", 1, DocType.PDF, {"source": "report.pdf"}),
+    ]
+    await service.add_chunks(chunks)
+    await service._chroma_lexical_candidates("liquidity coverage ratio", top_k=10)
+
+    assert service._store.limit == 1

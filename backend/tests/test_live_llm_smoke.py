@@ -2,7 +2,7 @@
 
 These tests are skipped unless RUN_LIVE_LLM_TESTS=1 and a real provider key is
 configured. They are not part of the deterministic CI suite; their purpose is
-to catch drift between the regex demo model and a real chat model.
+to catch drift between the deterministic demo model and a real chat model.
 """
 
 from __future__ import annotations

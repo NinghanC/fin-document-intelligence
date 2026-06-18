@@ -29,7 +29,12 @@ def has_provider_key() -> bool:
 
 
 def create_chat_model() -> Any:
-    """Return a provider-backed chat model, or a deterministic demo model."""
+    """Return a provider-backed chat model, or the offline demo model.
+
+    The demo model exists only to keep local demos and deterministic CI usable
+    without provider credentials. It is not a substitute for live LLM
+    validation; see the optional live_llm tests.
+    """
     if has_provider_key():
         return ChatOpenAI(
             model=settings.openai_model,
@@ -42,7 +47,11 @@ def create_chat_model() -> Any:
 
 @dataclass
 class DemoChatModel:
-    """Small deterministic model for offline demo and automated tests."""
+    """Small deterministic model for offline demos and automated tests.
+
+    This class intentionally uses simple rules and fixture-friendly formatting.
+    Provider-backed behavior must be validated with live_llm smoke tests.
+    """
 
     async def ainvoke(self, messages: list[Any]) -> AIMessage:
         system = self._content(messages[0]) if messages else ""
@@ -216,20 +225,7 @@ class DemoChatModel:
         if len(text) <= max_chars:
             return text
         lowered = text.lower()
-        broad_tokens = {
-            "2021",
-            "2022",
-            "2023",
-            "annual",
-            "apple",
-            "chase",
-            "fiscal",
-            "jpmorgan",
-            "microsoft",
-            "report",
-            "reported",
-            "year",
-        }
+        broad_tokens = {"2021", "2022", "2023", "annual", "fiscal", "report", "reported", "year"}
         focused_tokens = query_tokens - broad_tokens
         generic_metric_tokens = {"major", "ratio", "source", "sources"}
         preferred_tokens = focused_tokens - generic_metric_tokens
@@ -280,6 +276,7 @@ class DemoChatModel:
     def _format_factoid_answer(evidence: str, question: str) -> str:
         evidence_clean = re.sub(r"\s+", " ", evidence).strip()
         question_lower = question.lower()
+        subject = DemoChatModel._question_subject(question)
         if "liquidity coverage ratio" in question_lower:
             match = re.search(
                 r"liquidity coverage ratio.*?(?P<value>\d{2,3})(?:\s+\d{2,3}){0,2}",
@@ -288,7 +285,7 @@ class DemoChatModel:
             )
             if match:
                 return (
-                    "JPMorgan Chase reported an average liquidity coverage ratio "
+                    f"{subject} reported an average liquidity coverage ratio "
                     f"of {match.group('value')}% for 2023."
                 )
         revenue_match = re.search(
@@ -298,10 +295,10 @@ class DemoChatModel:
         )
         if "revenue" in question_lower and revenue_match:
             return (
-                "Microsoft reported that fiscal 2023 revenue increased "
+                f"{subject} reported that fiscal 2023 revenue increased "
                 f"{revenue_match.group('amount')}, driven by {revenue_match.group('drivers').strip()}."
             )
-        if "microsoft" in question_lower and "revenue" in question_lower:
+        if "revenue" in question_lower:
             segment_match = re.search(
                 r"Productivity and Business Processes\s+\$\s*(?P<productivity>[\d,]+).*?"
                 r"Intelligent Cloud\s+(?P<cloud>[\d,]+).*?"
@@ -311,12 +308,12 @@ class DemoChatModel:
             )
             if segment_match:
                 return (
-                    "Microsoft reported fiscal 2023 revenue by segment as "
+                    f"{subject} reported fiscal 2023 revenue by segment as "
                     f"Productivity and Business Processes ${segment_match.group('productivity')} million, "
                     f"Intelligent Cloud ${segment_match.group('cloud')} million, and "
                     f"More Personal Computing ${segment_match.group('personal')} million."
                 )
-        if "apple" in question_lower and "deferred revenue" in question_lower:
+        if "deferred revenue" in question_lower:
             deferred_match = re.search(
                 r"(?P<amount>\$\s*\d+(?:\.\d+)?\s*billion) of revenue recognized in 2023 .*?deferred revenue",
                 evidence_clean,
@@ -325,8 +322,28 @@ class DemoChatModel:
             if deferred_match:
                 amount = re.sub(r"\$\s+", "$", deferred_match.group("amount"))
                 return (
-                    "Apple recognized "
+                    f"{subject} recognized "
                     f"{amount} of revenue in 2023 that was included "
                     "in deferred revenue as of September 24, 2022."
                 )
         return ""
+
+    @staticmethod
+    def _question_subject(question: str) -> str:
+        """Best-effort subject label for deterministic offline answers."""
+        stop_phrases = {
+            "How",
+            "What",
+            "When",
+            "Where",
+            "Which",
+            "Who",
+            "Why",
+            "The",
+            "Did",
+        }
+        matches = re.findall(r"\b[A-Z][A-Za-z&.']+(?:\s+[A-Z][A-Za-z&.']+){0,4}\b", question)
+        candidates = [match.strip().removesuffix("'s") for match in matches if match.split()[0] not in stop_phrases]
+        if candidates:
+            return candidates[0]
+        return "The retrieved source"

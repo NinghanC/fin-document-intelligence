@@ -46,8 +46,8 @@ def test_weighted_grid_reports_best_branch_boost():
         {
             "answer": "liquidity",
             "sources": [
-                {"source": "vector-source.md", "score": 0.9, "type": "vector"},
-                {"source": "graph-source.md", "score": 0.7, "type": "graph"},
+                {"source": "vector-source.md", "snippet": "general fund overview", "score": 0.9, "type": "vector"},
+                {"source": "graph-source.md", "snippet": "liquidity controls", "score": 0.7, "type": "graph"},
             ],
         }
     ]
@@ -57,6 +57,37 @@ def test_weighted_grid_reports_best_branch_boost():
     assert result["mode"] == "weighted-grid"
     assert result["best"]["weights"]["graph"] > result["best"]["weights"]["vector"]
     assert result["best"]["hit_rate"] == 1.0
+
+
+def test_graphrag_eval_primary_metric_ignores_answer_text():
+    module = load_graphrag_eval_module()
+    questions = [
+        {
+            "question": "What liquidity coverage ratio did JPMorgan report?",
+            "expected_source": "jpmorgan.pdf",
+            "expected_terms": ["liquidity coverage ratio", "113"],
+            "expected_answer_terms": ["113%"],
+        }
+    ]
+    responses = [
+        {
+            "answer": "wrong answer from a demo model",
+            "sources": [
+                {
+                    "source": "jpmorgan.pdf",
+                    "snippet": "Liquidity coverage ratio average was 113 for 2023.",
+                    "type": "vector",
+                    "score": 0.9,
+                }
+            ],
+        }
+    ]
+
+    result = module._evaluate_rrf(questions, responses)
+
+    assert result["primary_metric"] == "retrieval_hit_rate"
+    assert result["hit_rate"] == 1.0
+    assert result["answer_hit_rate"] == 0.0
 
 
 def test_public_demo_questions_are_labeled():

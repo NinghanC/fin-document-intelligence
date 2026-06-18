@@ -159,7 +159,7 @@ def _build_ingest_graph(
             }
         except Exception as exc:
             logger.warning("ingest_store_failed_rolling_back", doc_id=doc_id, source=source, error=str(exc))
-            ingestion_registry.fail(doc_id)
+            ingestion_registry.fail(doc_id, error=str(exc))
             if vector_store and hasattr(vector_store, "delete_by_doc_id"):
                 await vector_store.delete_by_doc_id(doc_id)
             if knowledge_graph and hasattr(knowledge_graph, "delete_by_source"):

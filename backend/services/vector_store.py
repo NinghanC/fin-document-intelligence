@@ -77,11 +77,21 @@ class _HashEmbeddings:
     def _embed(self, text: str) -> list[float]:
         vector = [0.0] * self.dimensions
         tokens = re.findall(r"[a-zA-Z0-9]+", text.lower())
-        for token in tokens:
-            digest = hashlib.sha256(token.encode("utf-8")).digest()
-            idx = int.from_bytes(digest[:4], "big") % self.dimensions
-            sign = 1.0 if digest[4] % 2 == 0 else -1.0
-            vector[idx] += sign
+        compact = "".join(tokens)
+        char_ngrams = [
+            compact[index : index + 3]
+            for index in range(max(len(compact) - 2, 0))
+            if compact[index : index + 3]
+        ]
+        features = tokens + char_ngrams
+        if not features and text:
+            features = [text.lower()]
+        for feature in features:
+            digest = hashlib.sha256(feature.encode("utf-8")).digest()
+            for offset in range(0, 16, 4):
+                idx = int.from_bytes(digest[offset : offset + 4], "big") % self.dimensions
+                sign = 1.0 if digest[(offset + 16) % len(digest)] % 2 == 0 else -1.0
+                vector[idx] += sign / 4
         norm = math.sqrt(sum(v * v for v in vector)) or 1.0
         return [v / norm for v in vector]
 
@@ -282,8 +292,11 @@ class VectorStoreService:
         This keeps offline/hash-embedding demos usable for financial metric
         questions where exact terms matter more than approximate semantics.
         """
+        scan_limit = max(settings.chroma_lexical_scan_limit, 0)
+        if scan_limit == 0:
+            return []
         try:
-            result = await self._run_sync(self._store.get, include=["documents", "metadatas"])
+            result = await self._run_sync(self._store.get, include=["documents", "metadatas"], limit=scan_limit)
         except Exception as exc:
             logger.warning("chroma_lexical_candidate_scan_failed", error=str(exc))
             return []

@@ -63,8 +63,18 @@ class IngestionRegistry:
     def commit(self, doc_id: str) -> None:
         self._set_status(doc_id, "committed")
 
-    def fail(self, doc_id: str) -> None:
-        self._set_status(doc_id, "failed")
+    def fail(self, doc_id: str, error: str = "") -> None:
+        with self._lock:
+            records = self._load()
+            record = records.get(doc_id)
+            if record is None:
+                return
+            record["status"] = "failed"
+            record["error"] = error
+            record["failed_at"] = time.time()
+            record["retry_count"] = int(record.get("retry_count", 0)) + 1
+            record["updated_at"] = time.time()
+            self._save(records)
 
     def is_committed(self, doc_id: str | None) -> bool:
         if not doc_id:
@@ -79,6 +89,29 @@ class IngestionRegistry:
                 doc_id for doc_id, record in self._load().items()
                 if record.get("status") == "committed"
             }
+
+    def failed_records(self) -> list[IngestionRecord]:
+        with self._lock:
+            return [
+                self._record_from_dict(record)
+                for record in self._load().values()
+                if record.get("status") == "failed"
+            ]
+
+    def dead_letters(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                {
+                    "doc_id": doc_id,
+                    "source": record.get("source", ""),
+                    "content_hash": record.get("content_hash", ""),
+                    "error": record.get("error", ""),
+                    "retry_count": int(record.get("retry_count", 0)),
+                    "failed_at": record.get("failed_at"),
+                }
+                for doc_id, record in self._load().items()
+                if record.get("status") == "failed"
+            ]
 
     @staticmethod
     def compute_hash(path: str) -> str:

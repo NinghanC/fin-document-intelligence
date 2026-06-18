@@ -1,5 +1,5 @@
 """
-Document Parser Agent - multimodal document parsing for PDF / images / tables / plain text
+Document Parser Agent - document parsing for PDF / images / tables / plain text
 
 Core capabilities:
   1. PDF parsing (text + embedded images + tables)
@@ -21,6 +21,7 @@ from typing import Any
 import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from config import settings
 from utils.model_clients import create_chat_model
 
 logger = structlog.get_logger("finsight.doc_parser")
@@ -126,9 +127,9 @@ class DocParserAgent:
     # PDF parsing
     async def _parse_pdf(self, file_path: str) -> list[str]:
         """
-        Multimodal PDF parsing:
+        PDF parsing:
           1. Extract text pages
-          2. If a page contains images or tables, use LLM vision understanding
+          2. If text extraction fails, render pages and ask the vision-capable model for descriptions
         """
         texts: list[str] = []
         try:
@@ -151,28 +152,38 @@ class DocParserAgent:
     async def _pdf_vision_fallback(self, file_path: str) -> list[str]:
         """Use LLM vision when plain-text PDF extraction fails.
 
-        Pages are rendered one at a time so large scanned PDFs do not require
-        loading every page image into memory at once.
+        Pages are rendered and described with bounded concurrency so scanned
+        PDFs do not require a fully sequential LLM call per page.
         """
         try:
             from pdf2image import convert_from_path, pdfinfo_from_path
 
-            texts: list[str] = []
             page_count = int(pdfinfo_from_path(file_path).get("Pages", 0))
-            for page_number in range(1, page_count + 1):
-                images = convert_from_path(file_path, dpi=120, first_page=page_number, last_page=page_number)
-                if not images:
-                    continue
-                description = await self._describe_image_with_llm(images[0])
-                texts.append(f"[Page {page_number}]\n{description}")
-            return texts
+            semaphore = asyncio.Semaphore(max(settings.pdf_vision_concurrency, 1))
+
+            async def parse_page(page_number: int) -> str | None:
+                async with semaphore:
+                    images = await asyncio.to_thread(
+                        convert_from_path,
+                        file_path,
+                        dpi=120,
+                        first_page=page_number,
+                        last_page=page_number,
+                    )
+                    if not images:
+                        return None
+                    description = await self._describe_image_with_llm(images[0])
+                    return f"[Page {page_number}]\n{description}"
+
+            page_results = await asyncio.gather(*(parse_page(page_number) for page_number in range(1, page_count + 1)))
+            return [text for text in page_results if text]
         except Exception as exc:
             logger.warning("pdf_vision_parse_failed", file_path=file_path, error=str(exc))
             return [f"[PDF vision parsing failed] {file_path}"]
 
     # image parsing
     async def _parse_image(self, file_path: str) -> list[str]:
-        """Image parsing: OCR + LLM vision understanding"""
+        """Image parsing: OCR + vision-capable model description."""
         texts: list[str] = []
         ocr_text = self._ocr(file_path)
         if ocr_text.strip():
@@ -195,7 +206,7 @@ class DocParserAgent:
             return ""
 
     async def _describe_image_with_llm(self, image: Any) -> str:
-        """Use LLM multimodal capabilities to describe image content"""
+        """Use a vision-capable chat model to describe image content."""
         import base64
         import io
 

@@ -31,6 +31,7 @@ from config import settings
 from orchestrator.graph import build_knowledge_graph_workflow
 from services.api_state import APIStateStore
 from services.cdc_processor import CDCEvent, CDCProcessor
+from services.ingestion_registry import ingestion_registry
 from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import VectorStoreService
 
@@ -235,6 +236,7 @@ class StatsResponse(BaseModel):
     knowledge_graph: dict[str, Any]
     cdc: dict[str, Any] = Field(default_factory=dict)
     api: dict[str, Any] = Field(default_factory=dict)
+    ingestion: dict[str, Any] = Field(default_factory=dict)
 
 
 class UpdateRequest(BaseModel):
@@ -346,7 +348,7 @@ async def upload_batch(files: list[UploadFile] = File(...)):
 # QA Endpoints
 @app.post("/api/qa/ask", response_model=QuestionResponse, tags=["intelligent QA"], dependencies=[Depends(require_api_key)])
 async def ask_question(req: QuestionRequest):
-    """Intelligent QA - hybrid retrieval + knowledge graph reasoning"""
+    """Intelligent QA - hybrid retrieval + knowledge graph traversal"""
     qa_wf = workflows.get("qa")
     if not qa_wf:
         raise HTTPException(status_code=503, detail="QA workflow not initialized")
@@ -393,6 +395,7 @@ async def get_stats():
         knowledge_graph=kg_stats,
         cdc=cdc_processor.get_stats(),
         api=await api_state_store.get_request_stats(),
+        ingestion={"dead_letters": ingestion_registry.dead_letters()},
     )
 
 

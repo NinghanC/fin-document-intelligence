@@ -181,4 +181,6 @@ def test_admin_stats_includes_api_metrics(monkeypatch):
 
     assert response.status_code == 200
     assert "api" in response.json()
+    assert "ingestion" in response.json()
+    assert "dead_letters" in response.json()["ingestion"]
     assert response.json()["api"]["total_requests"] >= 1

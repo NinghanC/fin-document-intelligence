@@ -22,10 +22,30 @@ import structlog
 
 from agents.knowledge_extract_agent import Entity, Relation
 from config import settings
+from services.community_summarizer import (
+    CommunitySummarizer,
+    StructuredCommunitySummarizer,
+    create_community_summarizer,
+)
 from services.ingestion_registry import ingestion_registry
 from services.metapaths import MetapathResult, MetapathSpec
 
 WRITE_CYPHER_PATTERN = re.compile(r"\b(CREATE|MERGE|DELETE|SET|REMOVE|DROP|LOAD|CALL\s+dbms)\b", re.IGNORECASE)
+
+ALLOWED_RELATION_TYPES = {
+    "BELONGS_TO",
+    "DEPENDS_ON",
+    "DEVELOPED_BY",
+    "HOLDS",
+    "LOCATED_IN",
+    "OWNS",
+    "PART_OF",
+    "REGULATED_BY",
+    "RELATED_TO",
+    "SUBJECT_TO",
+    "USES",
+    "WORKS_AT",
+}
 
 logger = structlog.get_logger("finsight.knowledge_graph")
 
@@ -33,12 +53,13 @@ logger = structlog.get_logger("finsight.knowledge_graph")
 class KnowledgeGraphService:
     """Neo4j knowledge graph service"""
 
-    def __init__(self) -> None:
+    def __init__(self, community_summarizer: CommunitySummarizer | None = None) -> None:
         self._driver: Any = None
         self._entities: dict[str, dict[str, Any]] = {}
         self._aliases: dict[str, str] = {}
         self._relations: list[dict[str, Any]] = []
         self._community_summaries: dict[str, dict[str, Any]] = {}
+        self._community_summarizer = community_summarizer or create_community_summarizer()
 
     # lifecycle
     async def init(self) -> None:
@@ -82,12 +103,13 @@ class KnowledgeGraphService:
             "description": entity.description,
             "confidence": entity.confidence,
             "normalized_name": self.normalize_entity_name(entity.name),
-            "aliases": self._entity_aliases(entity.name),
+            "aliases": self._entity_aliases(entity),
+            "properties": entity.properties,
             "version": version,
             "source": source,
             "updated_at": int(time.time()),
         }
-        for alias in self._entity_aliases(entity.name):
+        for alias in self._entity_aliases(entity):
             self._aliases[self.normalize_entity_name(alias)] = entity.name
         if not self._driver:
             return
@@ -119,7 +141,7 @@ class KnowledgeGraphService:
             "description": entity.description,
             "confidence": entity.confidence,
             "normalized_name": self.normalize_entity_name(entity.name),
-            "aliases": self._entity_aliases(entity.name),
+            "aliases": self._entity_aliases(entity),
             "version": version,
             "source": source,
             "now": int(time.time()),
@@ -140,6 +162,8 @@ class KnowledgeGraphService:
             self._relations.append(rel_record)
         if not self._driver:
             return
+        # Cypher cannot parameterize relationship type tokens. rel_type is
+        # therefore constrained to ALLOWED_RELATION_TYPES before interpolation.
         cypher = f"""
         MATCH (h:Entity {{name: $head}})
         MATCH (t:Entity {{name: $tail}})
@@ -362,7 +386,7 @@ class KnowledgeGraphService:
                 "members": sorted(members),
                 "relations": rels,
                 "algorithm": algorithm,
-                "summary": self._format_community_summary(sorted(members), rels),
+                "summary": await self._summarize_community(sorted(members), rels),
             }
 
         self._community_summaries = summaries
@@ -571,6 +595,8 @@ class KnowledgeGraphService:
         rel_type = raw.upper().replace(" ", "_")
         if not re.match(r"^[A-Z_]+$", rel_type):
             return "RELATED_TO"
+        if rel_type not in ALLOWED_RELATION_TYPES:
+            return "RELATED_TO"
         return rel_type
 
     @staticmethod
@@ -585,23 +611,51 @@ class KnowledgeGraphService:
         return normalized
 
     @classmethod
-    def _entity_aliases(cls, name: str) -> list[str]:
+    def _entity_aliases(cls, entity_or_name: Entity | str) -> list[str]:
+        if isinstance(entity_or_name, Entity):
+            name = entity_or_name.name
+            properties = entity_or_name.properties
+        else:
+            name = entity_or_name
+            properties = {}
+
         aliases = {cls.normalize_entity_name(name)}
         compact = re.sub(r"[^A-Za-z0-9]", "", name).lower()
         if compact:
             aliases.add(compact)
-        ticker_aliases = {
-            "apple": {"aapl", "apple inc", "appleinc"},
-            "microsoft": {"msft", "microsoft corp", "microsoft corporation"},
-        }
-        aliases.update(ticker_aliases.get(cls.normalize_entity_name(name), set()))
+
+        acronym = "".join(part[0] for part in re.findall(r"[A-Za-z0-9]+", name)).lower()
+        if len(acronym) >= 2:
+            aliases.add(acronym)
+
+        ticker = properties.get("ticker") or properties.get("symbol")
+        if ticker:
+            aliases.add(cls.normalize_entity_name(str(ticker)))
+            aliases.add(re.sub(r"[^A-Za-z0-9.]", "", str(ticker)).lower())
+
+        explicit_aliases = properties.get("aliases", [])
+        if isinstance(explicit_aliases, str):
+            explicit_aliases = [explicit_aliases]
+        if isinstance(explicit_aliases, list):
+            for alias in explicit_aliases:
+                aliases.add(cls.normalize_entity_name(str(alias)))
+                compact_alias = re.sub(r"[^A-Za-z0-9]", "", str(alias)).lower()
+                if compact_alias:
+                    aliases.add(compact_alias)
+
         return sorted(aliases)
 
     @staticmethod
     def _format_community_summary(members: list[str], relations: list[str]) -> str:
-        member_text = ", ".join(members[:8])
-        relation_text = "; ".join(relations[:8]) if relations else "No direct relationships captured."
-        return f"Community containing {member_text}. Relationships: {relation_text}"
+        """Compatibility helper for older tests and scripts."""
+        return StructuredCommunitySummarizer.format(members, relations)
+
+    async def _summarize_community(self, members: list[str], relations: list[str]) -> str:
+        try:
+            return await self._community_summarizer.summarize(members, relations)
+        except Exception as exc:
+            logger.warning("community_summary_failed_using_structured", error=str(exc))
+            return await StructuredCommunitySummarizer().summarize(members, relations)
 
     def _visible_memory_entities(self) -> dict[str, dict[str, Any]]:
         return {
@@ -700,7 +754,7 @@ class KnowledgeGraphService:
                 "members": sorted(members),
                 "relations": rels,
                 "algorithm": algorithm,
-                "summary": self._format_community_summary(sorted(members), rels),
+                "summary": await self._summarize_community(sorted(members), rels),
             })
 
         await self.execute_cypher("MATCH (c:CommunitySummary) DETACH DELETE c", read_only=False)

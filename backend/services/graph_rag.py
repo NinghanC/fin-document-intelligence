@@ -3,7 +3,8 @@ GraphRAG hybrid retrieval pipeline - vector retrieval + graph traversal + rerank
 
 This is one of the core technical highlights of the project:
   Traditional RAG only performs vector retrieval and loses structured relationships between entities
-  GraphRAG combines the knowledge graph with vector retrieval to enable multi-hop reasoning
+  GraphRAG combines the knowledge graph with vector retrieval to expose multi-hop relationship evidence
+  and rule-derived inference facts.
 
 Workflow:
   Query -> [vector retrieval branch] -> merge -> cross-rerank -> Top-K
@@ -12,7 +13,8 @@ Workflow:
 Graph retrieval strategy:
   1. Entity linking: identify entities from the query and locate them in the graph
   2. Subgraph recall: traverse N hops from located entities
-  3. Path reasoning: find shortest paths between entities and provide reasoning chains
+  3. Path traversal: find shortest paths between entities and provide relationship chains
+  4. Logical inference: derive explicit facts from typed multi-hop paths
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from services.knowledge_graph import KnowledgeGraphService
+from services.logical_inference import LogicalInferenceEngine
 from services.metapaths import MetapathRouter, MetapathSpec
 from services.vector_store import VectorStoreService, _create_embeddings
 from utils.model_clients import create_chat_model
@@ -38,7 +41,7 @@ logger = structlog.get_logger("finsight.graphrag")
 @dataclass
 class GraphRAGContext:
     content: str
-    source_type: str  # "vector" | "subgraph" | "path" | "community" | "metapath"
+    source_type: str  # "vector" | "subgraph" | "path" | "community" | "metapath" | "inference"
     score: float
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -89,7 +92,7 @@ class GraphRAGPipeline:
 
     Combines three retrieval strategies:
       1. Vector semantic retrieval - captures semantically similar content
-      2. Graph subgraph retrieval - structured reasoning through entity relationships
+      2. Graph subgraph retrieval - structured traversal through entity relationships
       3. Community summary retrieval - summarizes subgraphs to provide a high-level overview
     """
 
@@ -105,6 +108,7 @@ class GraphRAGPipeline:
         self.embeddings = _create_embeddings()
         self.alias_table = {**DEFAULT_ALIAS_TABLE, **(alias_table or {})}
         self.metapath_router = MetapathRouter()
+        self.inference_engine = LogicalInferenceEngine()
 
     async def retrieve(self, query: str, top_k: int = 10) -> list[GraphRAGContext]:
         """
@@ -131,6 +135,7 @@ class GraphRAGPipeline:
             self._path_search(entities),
             self._community_retrieve(entities),
             self._metapath_search(query, entities),
+            self._logical_inference_search(query, entities),
             return_exceptions=True,
         )
         for branch_result in branch_results:
@@ -314,7 +319,7 @@ class GraphRAGPipeline:
         contexts: list[GraphRAGContext] = []
         for summary in summaries:
             content = str(summary.get("summary", ""))
-            if not content or "No direct relationships captured" in content:
+            if not content or "No direct intra-community relationships" in content:
                 continue
             contexts.append(GraphRAGContext(
                 content=content,
@@ -327,6 +332,21 @@ class GraphRAGPipeline:
                 },
             ))
         return contexts
+
+    # Step 7: rule-based multi-hop logical inference
+    async def _logical_inference_search(self, query: str, entities: list[str]) -> list[GraphRAGContext]:
+        if not entities:
+            return []
+        facts = await self.inference_engine.infer(query, entities, self.knowledge_graph)
+        return [
+            GraphRAGContext(
+                content=fact.evidence,
+                source_type="inference",
+                score=fact.confidence,
+                metadata=LogicalInferenceEngine.as_metadata(fact),
+            )
+            for fact in facts
+        ]
 
     # Step 6: Finance metapath retrieval
     async def _metapath_search(self, query: str, entities: list[str]) -> list[GraphRAGContext]:
@@ -377,7 +397,7 @@ class GraphRAGPipeline:
     def _is_context_list(value: object) -> TypeGuard[list[GraphRAGContext]]:
         return isinstance(value, list)
 
-    # Step 7: cross-rerank
+    # Step 8: cross-rerank
     async def _cross_rerank(self, contexts: list[GraphRAGContext], query: str) -> list[GraphRAGContext]:
         """
         Cross-rerank with query relevance inside each branch and RRF across branches.
@@ -414,7 +434,7 @@ class GraphRAGPipeline:
     @staticmethod
     def _reciprocal_rank_fusion(contexts: list[GraphRAGContext], rrf_k: int = 60) -> list[GraphRAGContext]:
         fused: dict[str, tuple[GraphRAGContext, float, list[str]]] = {}
-        for source_type in ("vector", "subgraph", "path", "community", "metapath"):
+        for source_type in ("vector", "subgraph", "path", "community", "metapath", "inference"):
             branch = sorted(
                 [ctx for ctx in contexts if ctx.source_type == source_type],
                 key=lambda item: item.score,

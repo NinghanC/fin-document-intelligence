@@ -3,16 +3,19 @@ import time
 
 import pytest
 
+import services.community_summarizer as community_summarizer_module
 from agents.doc_parser_agent import DocParserAgent, DocType, DocumentChunk
 from agents.knowledge_extract_agent import Entity, ExtractionResult, KnowledgeExtractAgent, Relation
 from agents.knowledge_update_agent import ChangeType, DocumentChange, KnowledgeUpdateAgent
 from agents.qa_agent import QAAgent, QAResult, QueryIntent, RetrievedContext
 from orchestrator.graph import _build_qa_graph
 from services.cdc_processor import CDCProcessor
+from services.community_summarizer import StructuredCommunitySummarizer
 from services.embedding_worker import _worker_process
 from services.graph_rag import GraphRAGContext, GraphRAGPipeline
 from services.ingestion_registry import ingestion_registry
 from services.knowledge_graph import KnowledgeGraphService
+from services.logical_inference import LogicalInferenceEngine
 from services.metapaths import FINANCIAL_METAPATHS, MetapathRouter, validate_all_metapaths
 from services.vector_store import _SubprocessEmbeddings
 
@@ -34,6 +37,15 @@ class KeywordEmbeddings:
         ]
 
 
+class RecordingCommunitySummarizer:
+    def __init__(self):
+        self.calls: list[tuple[list[str], list[str]]] = []
+
+    async def summarize(self, members: list[str], relations: list[str]) -> str:
+        self.calls.append((members, relations))
+        return f"LLM offline summary for {', '.join(members)}"
+
+
 def test_financial_metapaths_validate_and_route_by_domain_terms():
     validate_all_metapaths()
     router = MetapathRouter()
@@ -42,6 +54,15 @@ def test_financial_metapaths_validate_and_route_by_domain_terms():
 
     assert selected[0].name == "sector_exposure"
     assert FINANCIAL_METAPATHS["shared_sector"].steps[1].direction == "in"
+
+
+def test_llm_community_summarizer_requires_real_provider_key(monkeypatch):
+    monkeypatch.setattr(community_summarizer_module.settings, "community_summary_provider", "llm")
+    monkeypatch.setattr(community_summarizer_module, "has_provider_key", lambda: False)
+
+    summarizer = community_summarizer_module.create_community_summarizer()
+
+    assert isinstance(summarizer, StructuredCommunitySummarizer)
 
 
 @pytest.mark.asyncio
@@ -85,17 +106,114 @@ async def test_graphrag_metapath_search_adds_explainable_context():
     assert "Global Income Fund -[HOLDS]-> Microsoft" in contexts[0].content
 
 
-def test_multimodal_weights_keep_unknown_doc_type_neutral():
+@pytest.mark.asyncio
+async def test_logical_inference_derives_fact_from_multi_hop_path():
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Global Income Fund", "Fund"))
+    await graph.upsert_entity(Entity("Microsoft", "Company"))
+    await graph.upsert_entity(Entity("Technology", "Sector"))
+    await graph.add_relation(Relation("Global Income Fund", "holds", "Microsoft"))
+    await graph.add_relation(Relation("Microsoft", "belongs_to", "Technology"))
+
+    facts = await LogicalInferenceEngine().infer(
+        "Infer sector exposure for Global Income Fund",
+        ["Global Income Fund"],
+        graph,
+    )
+
+    assert facts
+    assert facts[0].rule_name == "fund_sector_exposure"
+    assert facts[0].conclusion == "Global Income Fund has inferred sector exposure to Technology."
+    assert ("Global Income Fund", "HOLDS", "Microsoft") in facts[0].path
+    assert ("Microsoft", "BELONGS_TO", "Technology") in facts[0].path
+
+
+@pytest.mark.asyncio
+async def test_graphrag_logical_inference_search_adds_inference_context():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Global Income Fund", "Fund"))
+    await graph.upsert_entity(Entity("Microsoft", "Company"))
+    await graph.upsert_entity(Entity("Technology", "Sector"))
+    await graph.add_relation(Relation("Global Income Fund", "holds", "Microsoft"))
+    await graph.add_relation(Relation("Microsoft", "belongs_to", "Technology"))
+    pipeline = GraphRAGPipeline(VectorStore(), graph)
+
+    contexts = await pipeline._logical_inference_search(
+        "Infer sector exposure for Global Income Fund",
+        ["Global Income Fund"],
+    )
+
+    assert contexts
+    assert contexts[0].source_type == "inference"
+    assert contexts[0].metadata["rule"] == "fund_sector_exposure"
+    assert "Therefore: Global Income Fund has inferred sector exposure to Technology." in contexts[0].content
+
+
+@pytest.mark.asyncio
+async def test_qa_adds_multimodal_table_reasoning_context():
     agent = QAAgent()
     contexts = [
-        RetrievedContext("image", "image.png", 1.0, "vector", {"doc_type": "image"}),
-        RetrievedContext("unknown", "unknown.bin", 0.9, "vector", {"doc_type": "binary"}),
+        RetrievedContext(
+            "Headers: Fund | Sector | Exposure\n"
+            "Fund: Global Income Fund | Sector: Technology | Exposure: 42%",
+            "exposures.csv",
+            0.6,
+            "vector",
+            {"doc_type": "table", "source": "exposures.csv"},
+        ),
     ]
 
-    reranked = agent._apply_multimodal_weights(contexts)
+    enriched = await agent._add_multimodal_reasoning(
+        "What technology exposure does Global Income Fund have?",
+        contexts,
+    )
 
-    assert reranked[0].source == "unknown.bin"
-    assert reranked[1].score == pytest.approx(0.85)
+    multimodal_contexts = [ctx for ctx in enriched if ctx.retrieval_type == "multimodal"]
+    assert multimodal_contexts
+    assert multimodal_contexts[0].metadata["reasoning_mode"] == "structured_table_reasoning"
+    assert "42%" in multimodal_contexts[0].content
+
+
+@pytest.mark.asyncio
+async def test_pdf_vision_fallback_uses_bounded_concurrency(monkeypatch):
+    import sys
+    import types
+
+    active = 0
+    max_active = 0
+
+    def pdfinfo_from_path(file_path):
+        return {"Pages": 3}
+
+    def convert_from_path(file_path, dpi, first_page, last_page):
+        return [object()]
+
+    fake_pdf2image = types.ModuleType("pdf2image")
+    fake_pdf2image.pdfinfo_from_path = pdfinfo_from_path
+    fake_pdf2image.convert_from_path = convert_from_path
+    monkeypatch.setitem(sys.modules, "pdf2image", fake_pdf2image)
+    monkeypatch.setattr("agents.doc_parser_agent.settings.pdf_vision_concurrency", 2)
+
+    parser = DocParserAgent()
+
+    async def describe(image):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.05)
+        active -= 1
+        return "page text"
+
+    parser._describe_image_with_llm = describe
+
+    texts = await parser._pdf_vision_fallback("scan.pdf")
+
+    assert len(texts) == 3
+    assert max_active == 2
 
 
 @pytest.mark.asyncio
@@ -147,6 +265,18 @@ def test_hybrid_rerank_deduplicates_contexts():
     unique = QAAgent._hybrid_rerank(contexts)
 
     assert len(unique) == 1
+
+
+def test_hybrid_rerank_does_not_deduplicate_distinct_contexts_with_same_prefix():
+    shared_prefix = "Apple reported revenue in the annual filing. " * 4
+    contexts = [
+        RetrievedContext(f"{shared_prefix}Revenue for 2023 was discussed.", "a", 0.9, "vector"),
+        RetrievedContext(f"{shared_prefix}Revenue for 2024 was discussed.", "b", 0.8, "graph"),
+    ]
+
+    unique = QAAgent._hybrid_rerank(contexts)
+
+    assert len(unique) == 2
 
 
 @pytest.mark.asyncio
@@ -271,10 +401,27 @@ async def test_entity_resolution_uses_normalized_suffix_match():
 @pytest.mark.asyncio
 async def test_entity_resolution_uses_graph_alias_index():
     graph = KnowledgeGraphService()
-    await graph.upsert_entity(Entity("Apple Inc.", "Organization"))
+    await graph.upsert_entity(Entity("Apple Inc.", "Organization", properties={"ticker": "AAPL"}))
 
     assert (await graph.find_entity_alias("AAPL"))["name"] == "Apple Inc."
     assert (await graph.find_entity_normalized("Apple Corp."))["name"] == "Apple Inc."
+
+
+def test_extraction_filter_keeps_single_normal_confidence_entity():
+    result = ExtractionResult(
+        entities=[
+            Entity("Global Income Fund", "Fund", confidence=0.75),
+            Entity("Duration Risk", "RiskFactor", confidence=0.8),
+        ],
+        relations=[Relation("Global Income Fund", "related_to", "Duration Risk", confidence=0.75)],
+        events=[],
+        source_chunk_id="chunk-1",
+    )
+
+    filtered = KnowledgeExtractAgent._filter_extraction_result(result)
+
+    assert {entity.name for entity in filtered.entities} == {"Global Income Fund", "Duration Risk"}
+    assert len(filtered.relations) == 1
 
 
 @pytest.mark.asyncio
@@ -316,6 +463,24 @@ async def test_community_summaries_are_precomputed_and_retrieved():
 
 
 @pytest.mark.asyncio
+async def test_provider_community_summarizer_runs_only_during_refresh():
+    summarizer = RecordingCommunitySummarizer()
+    graph = KnowledgeGraphService(community_summarizer=summarizer)
+    await graph.upsert_entity(Entity("Global Income Fund", "Product"))
+    await graph.upsert_entity(Entity("duration risk", "Concept"))
+    await graph.add_relation(Relation("Global Income Fund", "related_to", "duration risk"))
+
+    await graph.refresh_community_summaries()
+    summaries = await graph.get_community_summaries(["Global Income Fund"])
+    second_read = await graph.get_community_summaries(["duration risk"])
+
+    assert len(summarizer.calls) == 1
+    assert summaries[0]["summary"].startswith("LLM offline summary")
+    assert second_read
+    assert len(summarizer.calls) == 1
+
+
+@pytest.mark.asyncio
 async def test_graphrag_skips_empty_community_summaries():
     class VectorStore:
         async def search(self, query, top_k=5):
@@ -327,7 +492,10 @@ async def test_graphrag_skips_empty_community_summaries():
                 {
                     "community_id": "empty",
                     "members": ["JPMorgan Chase"],
-                    "summary": "Community containing JPMorgan Chase. Relationships: No direct relationships captured.",
+                    "summary": (
+                        "Graph community summary: JPMorgan Chase. "
+                        "No direct intra-community relationships were captured."
+                    ),
                 }
             ]
 
@@ -832,3 +1000,20 @@ async def test_ingestion_registry_skips_committed_same_content(tmp_path, monkeyp
     assert skipped_first is False
     assert skipped_second is True
     assert record.doc_id == "doc-1"
+
+
+def test_ingestion_registry_dead_letters_failed_records(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.ingestion_registry.settings.upload_dir", str(tmp_path))
+    ingestion_registry._records = {}
+    source = tmp_path / "failed.txt"
+    source.write_text("broken", encoding="utf-8")
+
+    skipped, _ = ingestion_registry.begin("failed-doc", str(source))
+    ingestion_registry.fail("failed-doc", error="vector store unavailable")
+
+    dead_letters = ingestion_registry.dead_letters()
+
+    assert skipped is False
+    assert dead_letters[0]["doc_id"] == "failed-doc"
+    assert dead_letters[0]["error"] == "vector store unavailable"
+    assert dead_letters[0]["retry_count"] == 1

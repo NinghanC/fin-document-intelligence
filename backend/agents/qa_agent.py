@@ -1,16 +1,17 @@
 """
-QA Agent - hybrid retrieval (Vector + Graph), multi-hop reasoning, and answer generation
+QA Agent - hybrid retrieval (Vector + Graph), relationship traversal, and answer generation
 
 Core capabilities:
   1. Intent recognition and query rewriting
   2. Vector retrieval (semantic similarity)
-  3. Graph retrieval (Cypher queries / subgraph traversal)
+  3. Graph retrieval (Cypher queries / subgraph and metapath traversal)
   4. Hybrid ranking and reranking
   5. Answer generation from retrieved results with source citations
 """
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from enum import Enum
@@ -189,14 +190,17 @@ class QAAgent:
                     )
                     for ctx in graph_rag_contexts
                 ]
-                return self._apply_multimodal_weights(contexts)
+                return await self._add_multimodal_reasoning(question, contexts)
             except Exception as exc:
                 logger.warning("graphrag_retrieve_failed_using_fallback", error=str(exc))
                 pass
 
         vector_contexts = await self._vector_retrieve(rewritten, top_k=top_k)
         graph_contexts = await self._graph_retrieve(question, rewritten)
-        return self._apply_multimodal_weights(self._hybrid_rerank(vector_contexts + graph_contexts))
+        return await self._add_multimodal_reasoning(
+            question,
+            self._hybrid_rerank(vector_contexts + graph_contexts),
+        )
 
     async def _retrieve_per_entity(self, question: str, rewritten: dict, per_entity_k: int = 3) -> list[RetrievedContext]:
         entities = [str(entity) for entity in rewritten.get("entities", []) if entity]
@@ -211,7 +215,7 @@ class QAAgent:
                 "entities": [entity],
             }
             contexts.extend(await self._retrieve_contexts(question, entity_rewrite, top_k=per_entity_k))
-        return self._apply_multimodal_weights(self._hybrid_rerank(contexts))
+        return await self._add_multimodal_reasoning(question, self._hybrid_rerank(contexts))
 
     @staticmethod
     def _prioritize_policy_contexts(contexts: list[RetrievedContext]) -> list[RetrievedContext]:
@@ -235,14 +239,24 @@ class QAAgent:
             fallback, key=lambda ctx: ctx.score, reverse=True
         )
 
-    def _apply_multimodal_weights(self, contexts: list[RetrievedContext]) -> list[RetrievedContext]:
-        """Apply modality-aware reranking to vector contexts before final balancing."""
-        for ctx in contexts:
-            if ctx.retrieval_type == "vector":
-                doc_type = str(ctx.metadata.get("doc_type", ""))
-                ctx.score *= self.multimodal.MODALITY_WEIGHTS.get(doc_type, 1.0)
-        contexts.sort(key=lambda ctx: ctx.score, reverse=True)
-        return contexts
+    async def _add_multimodal_reasoning(
+        self,
+        question: str,
+        contexts: list[RetrievedContext],
+    ) -> list[RetrievedContext]:
+        """Add query-time table/image reasoning contexts."""
+        multimodal_results = await self.multimodal.reason_over_contexts(question, contexts)
+        enriched = list(contexts)
+        for result in multimodal_results:
+            enriched.append(RetrievedContext(
+                content=result.content,
+                source=str(result.metadata.get("source", result.modality)),
+                score=result.score,
+                retrieval_type="multimodal",
+                metadata={"source_type": "multimodal", "doc_type": result.modality, **result.metadata},
+            ))
+        enriched.sort(key=lambda ctx: ctx.score, reverse=True)
+        return enriched
 
     @staticmethod
     def _context_limit_for_intent(intent: QueryIntent) -> int:
@@ -258,7 +272,7 @@ class QAAgent:
     def _balanced_top_contexts(contexts: list[RetrievedContext], limit: int = 8) -> list[RetrievedContext]:
         """Keep the highest-ranking contexts while preserving hybrid source diversity."""
         selected: list[RetrievedContext] = []
-        for retrieval_type in ("vector", "graph"):
+        for retrieval_type in ("vector", "graph", "multimodal"):
             first = next((ctx for ctx in contexts if ctx.retrieval_type == retrieval_type), None)
             if first is not None and first not in selected:
                 selected.append(first)
@@ -368,9 +382,10 @@ class QAAgent:
         seen: set[str] = set()
         unique: list[RetrievedContext] = []
         for ctx in contexts:
-            key = ctx.content[:100]
+            key = QAAgent._dedup_key(ctx.content)
             if key not in seen:
                 seen.add(key)
+                ctx.metadata["dedup_key"] = key
                 unique.append(ctx)
 
         fused: dict[str, tuple[RetrievedContext, float, list[str]]] = {}
@@ -381,7 +396,7 @@ class QAAgent:
                 reverse=True,
             )
             for rank, ctx in enumerate(branch, start=1):
-                key = ctx.content[:100]
+                key = str(ctx.metadata.get("dedup_key", QAAgent._dedup_key(ctx.content)))
                 contribution = 1 / (60 + rank)
                 if key in fused:
                     existing, score, sources = fused[key]
@@ -401,6 +416,11 @@ class QAAgent:
 
         reranked.sort(key=lambda ctx: float(ctx.metadata.get("rrf_score", 0.0)), reverse=True)
         return reranked
+
+    @staticmethod
+    def _dedup_key(content: str) -> str:
+        normalized = re.sub(r"\s+", " ", content.lower()).strip()
+        return hashlib.md5(normalized.encode(), usedforsecurity=False).hexdigest()
 
     @classmethod
     def _graph_record_score(cls, question: str, record: dict[str, Any]) -> float:
@@ -433,6 +453,7 @@ class QAAgent:
             f"Retrieved {len(contexts)} relevant contexts",
             f"Vector retrieval: {sum(1 for c in contexts if c.retrieval_type == 'vector')}",
             f"Graph retrieval: {sum(1 for c in contexts if c.retrieval_type == 'graph')}",
+            f"Multimodal reasoning: {sum(1 for c in contexts if c.retrieval_type == 'multimodal')}",
         ]
 
         if contexts:
@@ -468,7 +489,13 @@ class QAAgent:
         unique_sources = len({c.source for c in contexts if c.source})
         source_diversity = min(unique_sources / 3, 1.0)
         has_graph_support = any(c.retrieval_type == "graph" for c in contexts)
-        retrieval_quality = (best_score * 0.5) + (source_diversity * 0.3) + (0.2 if has_graph_support else 0.0)
+        has_multimodal_support = any(c.retrieval_type == "multimodal" for c in contexts)
+        retrieval_quality = (
+            (best_score * 0.45)
+            + (source_diversity * 0.25)
+            + (0.2 if has_graph_support else 0.0)
+            + (0.1 if has_multimodal_support else 0.0)
+        )
         return round(min(retrieval_quality, 1.0), 2)
 
     _calc_confidence = _calc_retrieval_quality

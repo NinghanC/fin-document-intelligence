@@ -23,4 +23,5 @@ testpaths = ["backend/tests"]
 asyncio_mode = "auto"
 markers = [
   "live_llm: optional provider-backed LLM smoke tests; requires OPENAI_API_KEY",
+  "live_infra: optional Docker-backed infrastructure smoke tests; requires Neo4j, ChromaDB, and PGVector",
 ]

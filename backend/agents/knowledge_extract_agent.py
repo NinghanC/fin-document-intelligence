@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -141,6 +140,7 @@ class KnowledgeExtractAgent:
                 type=e.get("type", "Concept"),
                 description=e.get("description", ""),
                 confidence=float(e.get("confidence", 1.0)),
+                properties=e.get("properties", {}) if isinstance(e.get("properties", {}), dict) else {},
             )
             for e in data.get("entities", [])
             if e.get("name")
@@ -172,13 +172,13 @@ class KnowledgeExtractAgent:
 
     @staticmethod
     def _filter_extraction_result(result: ExtractionResult) -> ExtractionResult:
-        """Apply lightweight quality gates before graph storage."""
+        """Apply lightweight per-chunk quality gates before graph storage.
+
+        Cross-chunk frequency checks belong in the deduplication stage. A
+        single high-quality chunk mention is a normal extraction case and must
+        not be dropped just because it appears once in that chunk.
+        """
         entities = [entity for entity in result.entities if entity.confidence >= 0.7]
-        name_counts = Counter(entity.name for entity in entities)
-        entities = [
-            entity for entity in entities
-            if name_counts[entity.name] >= 2 or entity.confidence >= 0.9
-        ]
         valid_names = {entity.name for entity in entities}
         relations = [
             relation for relation in result.relations
