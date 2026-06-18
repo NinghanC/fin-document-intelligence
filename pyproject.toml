@@ -21,3 +21,6 @@ exclude = ["backend/tests"]
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 asyncio_mode = "auto"
+markers = [
+  "live_llm: optional provider-backed LLM smoke tests; requires OPENAI_API_KEY",
+]

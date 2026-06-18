@@ -454,6 +454,24 @@ Company -> belongs_to -> Sector <- belongs_to <- Company
 
 This complements the public-document API benchmark. The public filings test answer/source grounding; the synthetic metapath benchmark tests full graph-pattern coverage; the real-holdings benchmark tests whether those patterns work on a public-finance data shape.
 
+#### Optional Live LLM Smoke Tests
+
+Most automated tests use the deterministic demo model so CI can run without provider credentials. That proves orchestration, parsing, retrieval, graph traversal, and API behavior, but it does not prove a real LLM follows the prompts.
+
+For that reason, the repo includes optional provider-backed smoke tests marked `live_llm`. They validate three narrow behaviors against the configured chat model:
+
+- intent classification returns the expected label for a financial factoid question
+- knowledge extraction returns parseable JSON with finance entities and relations
+- grounded answering uses supplied context and cites the source name
+
+Run them only when a real provider key is configured:
+
+```bash
+RUN_LIVE_LLM_TESTS=1 OPENAI_API_KEY=... pytest -m live_llm backend/tests/test_live_llm_smoke.py
+```
+
+These are smoke tests, not a full evaluation set. They are intentionally separate from the default test suite because live models add cost, latency, and occasional nondeterminism.
+
 The default public-demo questions use only publicly available annual reports and 10-K filings:
 
 | Question | Expected source | Expected evidence |
