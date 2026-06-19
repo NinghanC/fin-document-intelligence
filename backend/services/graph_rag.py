@@ -348,8 +348,8 @@ class GraphRAGPipeline:
         traverse_metapath = getattr(self.knowledge_graph, "traverse_metapath", None)
         if not callable(traverse_metapath):
             return []
-        selected_metapaths = self.metapath_router.select(query, entities)
-        if not selected_metapaths:
+        selections = self.metapath_router.select_with_trace(query, entities)
+        if not selections:
             return []
 
         contexts: list[GraphRAGContext] = []
@@ -357,14 +357,15 @@ class GraphRAGPipeline:
             *(
                 self.knowledge_graph.traverse_metapath(
                     start_entities=entities,
-                    metapath=metapath,
+                    metapath=selection.spec,
                     limit=10,
                 )
-                for metapath in selected_metapaths
+                for selection in selections
             ),
             return_exceptions=True,
         )
-        for metapath, result in zip(selected_metapaths, traversal_results, strict=False):
+        for selection, result in zip(selections, traversal_results, strict=False):
+            metapath = selection.spec
             if isinstance(result, BaseException):
                 logger.warning("metapath_search_failed", metapath=metapath.name, error=str(result))
                 continue
@@ -380,9 +381,15 @@ class GraphRAGPipeline:
                     metadata={
                         "metapath": path_result.metapath_name,
                         "path": list(path_result.path),
+                        "path_edges": [
+                            {"source": head, "relation": relation, "target": tail}
+                            for head, relation, tail in path_result.path
+                        ],
                         "start_entity": path_result.start_entity,
                         "end_entity": path_result.end_entity,
+                        "intermediate_entities": list(path_result.intermediate_entities),
                         "description": metapath.description,
+                        "selection_trace": selection.as_trace(),
                         "score_method": "metapath_coverage_lexical",
                     },
                 ))

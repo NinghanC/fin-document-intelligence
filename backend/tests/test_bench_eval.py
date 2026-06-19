@@ -157,8 +157,13 @@ def test_metapath_eval_dataset_reaches_expected_paths():
 
     assert result["total"] >= 16
     assert result["router_hit_rate"] == 1.0
-    assert result["path_hit_rate"] == 1.0
-    assert result["average_path_recall"] == 1.0
+    assert result["routed_path_hit_rate"] == 1.0
+    assert result["oracle_path_hit_rate"] == 1.0
+    assert result["average_routed_path_recall"] == 1.0
+    assert result["average_oracle_path_recall"] == 1.0
+    assert result["path_hit_rate"] == result["routed_path_hit_rate"]
+    assert result["average_path_recall"] == result["average_routed_path_recall"]
+    assert all(row["router_trace"] for row in result["rows"])
 
 
 def test_real_holdings_eval_dataset_reaches_expected_paths():
@@ -172,9 +177,22 @@ def test_real_holdings_eval_dataset_reaches_expected_paths():
     assert result["holdings_rows"] >= 20
     assert result["questions"] >= 8
     assert result["router_hit_rate"] == 1.0
-    assert result["path_hit_rate"] == 1.0
-    assert result["average_path_recall"] == 1.0
+    assert result["routed_path_hit_rate"] == 1.0
+    assert result["oracle_path_hit_rate"] == 1.0
+    assert result["average_routed_path_recall"] == 1.0
+    assert result["average_oracle_path_recall"] == 1.0
+    assert result["path_hit_rate"] == result["routed_path_hit_rate"]
+    assert result["average_path_recall"] == result["average_routed_path_recall"]
+    assert all(row["router_trace"] for row in result["rows"])
 
+
+def test_live_eval_questions_exclude_graph_inference_scope():
+    questions_path = Path(__file__).resolve().parents[2] / "bench" / "live_eval" / "questions.json"
+    questions = json.loads(questions_path.read_text(encoding="utf-8"))
+
+    assert questions
+    assert all(item["answer_type"] != "graph_inference" for item in questions)
+    assert {"factoid", "table", "insufficient"} <= {item["answer_type"] for item in questions}
 def test_live_eval_scores_grounded_answers_and_insufficient_cases():
     module = load_live_eval_module()
     questions = [
@@ -225,3 +243,46 @@ def test_live_eval_scores_grounded_answers_and_insufficient_cases():
     assert result["summary"]["insufficient_hit_rate"] == 1.0
     assert result["summary"]["by_answer_type"]["factoid"]["pass_rate"] == 1.0
     assert result["summary"]["by_answer_type"]["insufficient"]["pass_rate"] == 1.0
+
+def test_live_eval_accepts_bedrock_env_file(tmp_path, monkeypatch):
+    module = load_live_eval_module()
+    env_file = tmp_path / "bedrock.env"
+    env_file.write_text(
+        "MODEL_PROVIDER=bedrock\nAWS_REGION=us-east-1\nBEDROCK_MODEL_ID=amazon.nova-lite-v1:0\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("MODEL_PROVIDER", raising=False)
+    monkeypatch.delenv("AWS_REGION", raising=False)
+    monkeypatch.delenv("BEDROCK_MODEL_ID", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    module._load_env_file(str(env_file))
+
+    assert module._provider_configured() is True
+
+
+def test_live_eval_insufficient_accepts_context_does_not_contain_phrase():
+    module = load_live_eval_module()
+    result = module.evaluate(
+        [
+            {
+                "id": "insufficient",
+                "answer_type": "insufficient",
+                "question": "What is the private internal stress-loss limit?",
+                "expected_sources": [],
+                "expected_evidence_terms": [],
+                "expected_answer_points": [],
+            }
+        ],
+        [
+            {
+                "answer": "The provided context does not contain that private internal limit.",
+                "sources": [],
+                "retrieval_quality": 0.0,
+                "intent": "factoid",
+            }
+        ],
+    )
+
+    assert result["summary"]["pass_rate"] == 1.0
+    assert result["items"][0]["insufficient_hit"] is True

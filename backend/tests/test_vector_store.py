@@ -82,7 +82,7 @@ async def test_vector_store_add_and_search(monkeypatch):
     assert len(results) == 2
     assert results[0][0]["content"] == "Hello world"
     assert results[0][0]["source"] == "test"
-    assert results[0][1] == pytest.approx(0.93235)
+    assert results[0][1] == pytest.approx(0.9)
     assert results[0][0]["metadata"]["doc_id"] == "doc-1"
     assert results[0][0]["metadata"]["lexical_score"] == 1.0
     assert results[1][0]["metadata"]["chunk_id"] == "doc-1#chunk-1"
@@ -230,6 +230,23 @@ def test_lexical_boost_can_promote_exact_financial_term_match():
     assert exact[0]["metadata"]["lexical_score"] == 1.0
 
 
+
+def test_lexical_scoring_uses_source_filename_for_entity_queries():
+    microsoft = VectorStoreService._score_result(
+        "Microsoft reported revenue segments fiscal 2023",
+        "Reported revenue by business segment is shown below.",
+        {"source": "microsoft_2023_10k.pdf"},
+        vector_score=0.2,
+    )
+    jpmorgan = VectorStoreService._score_result(
+        "Microsoft reported revenue segments fiscal 2023",
+        "Reported revenue by business segment is shown below.",
+        {"source": "jpmorgan_2023_annual_report.pdf"},
+        vector_score=0.2,
+    )
+
+    assert microsoft[0]["metadata"]["lexical_score"] == jpmorgan[0]["metadata"]["lexical_score"]
+    assert microsoft[0]["metadata"]["metadata_score"] > jpmorgan[0]["metadata"]["metadata_score"]
 def test_hash_embeddings_are_not_degenerate_for_short_texts():
     embeddings = vector_store_module._HashEmbeddings(dimensions=64)
     exact = embeddings.embed_query("AI")

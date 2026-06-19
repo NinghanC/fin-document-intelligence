@@ -114,3 +114,26 @@ async def test_resilient_chat_model_raises_when_fallback_disabled(monkeypatch):
 
     with pytest.raises(RuntimeError, match="provider unavailable"):
         await model.ainvoke([HumanMessage(content="hello")])
+
+def test_bedrock_session_ignores_empty_aws_profile_env(monkeypatch):
+    created_sessions = []
+
+    class FakeSession:
+        def __init__(self, **kwargs):
+            created_sessions.append(kwargs)
+
+        def client(self, service_name, region_name=None):
+            return {"service_name": service_name, "region_name": region_name}
+
+    fake_boto3 = type("FakeBoto3", (), {"Session": FakeSession})
+    monkeypatch.setitem(__import__("sys").modules, "boto3", fake_boto3)
+    monkeypatch.setenv("AWS_PROFILE", "")
+    monkeypatch.setattr(model_clients.settings, "aws_profile", "")
+    monkeypatch.setattr(model_clients.settings, "aws_region", "us-east-1")
+    monkeypatch.setattr(model_clients.settings, "bedrock_model_id", "amazon.nova-lite-v1:0")
+
+    model = BedrockChatModel()
+
+    assert created_sessions == [{}]
+    assert "AWS_PROFILE" not in __import__("os").environ
+    assert model.client == {"service_name": "bedrock-runtime", "region_name": "us-east-1"}

@@ -155,7 +155,7 @@ class QAAgent:
     async def _retrieve_for_intent(self, question: str, rewritten: dict, intent: QueryIntent) -> list[RetrievedContext]:
         if intent == QueryIntent.FACTOID:
             contexts = await self._retrieve_contexts(question, rewritten, top_k=6)
-            return self._balanced_top_contexts(contexts, limit=3)
+            return self._balanced_top_contexts(contexts, limit=5)
 
         if intent == QueryIntent.COMPARATIVE:
             contexts = await self._retrieve_per_entity(question, rewritten, per_entity_k=3)

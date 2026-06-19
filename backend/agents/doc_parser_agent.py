@@ -296,6 +296,37 @@ class DocParserAgent:
             return [f.read()]
 
     # chunking
+    @staticmethod
+    def _normalize_extracted_text(text: str) -> str:
+        """Clean common PDF/OCR mojibake before chunking and indexing."""
+        if not text:
+            return ""
+
+        replacements = {
+            "\ufeff": "",
+            "\u00e2\u20ac\u2122": "'",
+            "\u00e2\u20ac\u02dc": "'",
+            "\u00e2\u20ac\u0153": '"',
+            "\u00e2\u20ac\u009d": '"',
+            "\u00e2\u20ac\u201d": "-",
+            "\u00e2\u20ac\u201c": "-",
+            "\u00e2\u20ac\u00a2": "- ",
+            "\u00e2\u00a2": "- ",
+            "\u00c2\u00b7": " - ",
+            "\u00c2\u00a0": " ",
+            "\u00c2": "",
+        }
+        for bad, good in replacements.items():
+            text = text.replace(bad, good)
+
+        text = re.sub(r"\u00e2([A-Za-z][A-Za-z0-9 %().,/&:-]{0,40})\u00e2", r'"\1"', text)
+        text = re.sub(r"(?<=\w)\u00e2s\b", "'s", text)
+        text = text.replace("\u00e2", "")
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r" *\n *", "\n", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
     def _chunk_texts(
         self,
         texts: list[str],
@@ -306,6 +337,7 @@ class DocParserAgent:
         chunks: list[DocumentChunk] = []
         idx = 0
         for text in texts:
+            text = self._normalize_extracted_text(text)
             for start, end, content in self._token_budget_spans(text):
                 if content.strip():
                     chunks.append(DocumentChunk(

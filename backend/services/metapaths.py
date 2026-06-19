@@ -8,6 +8,7 @@ knowledge, not learned model parameters.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -71,6 +72,30 @@ class MetapathResult:
     path: tuple[tuple[str, str, str], ...]
     evidence: str
     score: float
+
+    @property
+    def intermediate_entities(self) -> tuple[str, ...]:
+        if not self.path:
+            return ()
+        return tuple(edge[2] for edge in self.path[:-1])
+
+
+@dataclass(frozen=True)
+class MetapathSelection:
+    spec: MetapathSpec
+    score: int
+    matched_keywords: tuple[str, ...]
+    reason: str
+    fallback: bool = False
+
+    def as_trace(self) -> dict[str, object]:
+        return {
+            "metapath": self.spec.name,
+            "score": self.score,
+            "matched_keywords": list(self.matched_keywords),
+            "reason": self.reason,
+            "fallback": self.fallback,
+        }
 
 
 FINANCIAL_METAPATHS: dict[str, MetapathSpec] = {
@@ -180,16 +205,53 @@ class MetapathRouter:
         validate_all_metapaths(self.specs)
 
     def select(self, query: str, entities: list[str] | None = None, limit: int = 3) -> list[MetapathSpec]:
+        return [selection.spec for selection in self.select_with_trace(query, entities, limit)]
+
+    def select_with_trace(
+        self,
+        query: str,
+        entities: list[str] | None = None,
+        limit: int = 3,
+    ) -> list[MetapathSelection]:
         lowered = query.lower()
-        scored: list[tuple[int, str, MetapathSpec]] = []
+        scored: list[tuple[int, str, MetapathSelection]] = []
         for name, spec in self.specs.items():
-            score = sum(1 for keyword in spec.keywords if keyword in lowered)
+            matched_keywords = tuple(keyword for keyword in spec.keywords if self._keyword_matches(lowered, keyword))
+            score = len(matched_keywords)
             if score:
-                scored.append((score, name, spec))
+                scored.append((
+                    score,
+                    name,
+                    MetapathSelection(
+                        spec=spec,
+                        score=score,
+                        matched_keywords=matched_keywords,
+                        reason=f"matched query terms: {', '.join(matched_keywords)}",
+                    ),
+                ))
 
         if not scored and entities:
-            for name in ("sector_exposure", "geographic_risk", "compliance_chain"):
-                scored.append((1, name, self.specs[name]))
+            fallback_names = ("sector_exposure", "geographic_risk", "compliance_chain")
+            for name in fallback_names:
+                spec = self.specs[name]
+                scored.append((
+                    1,
+                    name,
+                    MetapathSelection(
+                        spec=spec,
+                        score=1,
+                        matched_keywords=(),
+                        reason="fallback for linked financial entities without a more specific query term",
+                        fallback=True,
+                    ),
+                ))
 
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
-        return [spec for _, _, spec in scored[:limit]]
+        return [selection for _, _, selection in scored[:limit]]
+
+    @staticmethod
+    def _keyword_matches(lowered_query: str, keyword: str) -> bool:
+        escaped = re.escape(keyword.lower())
+        if "\\ " in escaped:
+            return re.search(rf"(?<!\w){escaped}(?!\w)", lowered_query) is not None
+        return re.search(rf"(?<!\w){escaped}s?(?!\w)", lowered_query) is not None

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
-import re
+import os
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
@@ -106,8 +106,12 @@ class BedrockChatModel:
             raise RuntimeError("boto3 is required for MODEL_PROVIDER=bedrock") from exc
 
         session_kwargs: dict[str, str] = {}
-        if settings.aws_profile.strip():
-            session_kwargs["profile_name"] = settings.aws_profile.strip()
+        profile_name = settings.aws_profile.strip()
+        if profile_name:
+            session_kwargs["profile_name"] = profile_name
+        else:
+            os.environ.pop("AWS_PROFILE", None)
+            os.environ.pop("AWS_DEFAULT_PROFILE", None)
         session = boto3.Session(**session_kwargs)
         self.client = session.client("bedrock-runtime", region_name=settings.aws_region)
 
@@ -204,10 +208,11 @@ class BedrockChatModel:
 
 @dataclass
 class DemoChatModel:
-    """Small deterministic model for offline demos and automated tests.
+    """Generic offline stub for local wiring tests only.
 
-    This class intentionally uses simple rules and fixture-friendly formatting.
-    Provider-backed behavior must be validated with live_llm smoke tests.
+    It deliberately avoids benchmark-specific financial knowledge, answer
+    extraction rules, and synthetic relationship generation. Configure a real
+    provider for any answer-quality or extraction-quality validation.
     """
 
     async def ainvoke(self, messages: list[Any]) -> AIMessage:
@@ -227,7 +232,7 @@ class DemoChatModel:
         if "knowledge graph analysis expert" in system:
             return AIMessage(content=self._summarize(user))
         if "Describe the image" in user or "Describe all content" in user:
-            return AIMessage(content="Image content was captured for document intelligence processing.")
+            return AIMessage(content="Offline demo model cannot perform real vision reasoning.")
         return AIMessage(content=self._answer(user))
 
     @staticmethod
@@ -238,26 +243,27 @@ class DemoChatModel:
         return str(content)
 
     @staticmethod
-    def _entities(text: str) -> list[str]:
-        candidates = [
-            "Global Income Fund",
-            "duration risk",
-            "interest rates",
-            "credit spread",
-            "liquidity buffer",
-            "portfolio manager",
-            "risk committee",
-        ]
-        lowered = text.lower()
-        found = [name for name in candidates if name.lower() in lowered]
-        if found:
-            return found
-        words = re.findall(r"\b[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,3}\b", text)
-        return list(dict.fromkeys(words))[:5]
+    def _tokens(text: str) -> list[str]:
+        return [token.strip(".,:;!?()[]{}<>\\\"'") for token in text.split() if token.strip(".,:;!?()[]{}<>\\\"'")]
+
+    @classmethod
+    def _entities(cls, text: str) -> list[str]:
+        entities: list[str] = []
+        current: list[str] = []
+        for token in cls._tokens(text):
+            if token[:1].isupper() and any(char.isalpha() for char in token):
+                current.append(token)
+                continue
+            if current:
+                entities.append(" ".join(current))
+                current = []
+        if current:
+            entities.append(" ".join(current))
+        return list(dict.fromkeys(entities))[:5]
 
     def _rewrite(self, question: str) -> dict[str, Any]:
         entities = self._entities(question)
-        keywords = re.findall(r"\b[a-zA-Z]{4,}\b", question.lower())[:8]
+        keywords = [token.lower() for token in self._tokens(question) if len(token) >= 4 and token.isalpha()][:8]
         return {
             "queries": [question, " ".join(entities + keywords).strip() or question],
             "entities": entities,
@@ -269,7 +275,7 @@ class DemoChatModel:
         lowered = question.lower()
         if any(word in lowered for word in ("compare", "versus", "difference")):
             return "comparative"
-        if any(word in lowered for word in ("why", "impact", "risk", "explain")):
+        if any(word in lowered for word in ("why", "impact", "analyze", "explain")):
             return "analytical"
         if "how much" not in lowered and any(word in lowered for word in ("how", "steps", "process")):
             return "procedural"
@@ -277,134 +283,30 @@ class DemoChatModel:
 
     def _extract(self, user: str) -> dict[str, Any]:
         text = user.split("\n\n", 1)[-1]
-        entity_names = self._entities(text)
         entities = [
             {
                 "name": name,
-                "type": "Product" if "Fund" in name else "Concept",
-                "description": f"Entity mentioned in the ingested financial document: {name}",
+                "type": "Concept",
+                "description": f"Entity mention detected by offline demo parser: {name}",
+                "confidence": 0.5,
             }
-            for name in entity_names
+            for name in self._entities(text)
         ]
-        relations = []
-        if "Global Income Fund" in entity_names:
-            for tail in entity_names:
-                if tail != "Global Income Fund":
-                    relations.append({
-                        "head": "Global Income Fund",
-                        "relation": "related_to",
-                        "tail": tail,
-                        "confidence": 0.82,
-                    })
-        return {"entities": entities, "relations": relations, "events": []}
+        return {"entities": entities, "relations": [], "events": []}
 
     @staticmethod
     def _summarize(user: str) -> str:
         body = user.split("Subgraph information:", 1)[-1].strip()
         digest = sha256(body.encode("utf-8")).hexdigest()[:8]
-        return f"Community summary ({digest}): related fund-risk entities form a connected reasoning context."
+        return f"Offline structured summary ({digest}). Configure a provider for natural-language community summaries."
 
     @staticmethod
     def _answer(user: str) -> str:
-        if "Context information:" in user:
-            context = user.split("Context information:", 1)[1].split("User question:", 1)[0].strip()
-            question = user.split("User question:", 1)[-1]
-
-            evidence = DemoChatModel._best_evidence_line(context, question)
-            if not DemoChatModel._evidence_supports_question(evidence, question):
-                return (
-                    "The retrieved context is truncated or insufficient to answer this question reliably. "
-                    "[Source: retrieved context]"
-                )
-
-            return (
-                "Based on the retrieved context, "
-                f"{evidence or 'the available evidence supports the answer'}. "
-                "[Source: retrieved context]"
-            )
-        return "The demo model needs retrieved document context to provide a grounded answer."
-
-    @staticmethod
-    def _best_evidence_line(context: str, question: str) -> str:
-        query_tokens = {
-            token
-            for token in re.findall(r"[a-zA-Z0-9]+", question.lower())
-            if len(token) >= 3 and token not in {"and", "did", "for", "the", "their", "what", "which"}
-        }
-        lines = [
-            line.strip()
-            for line in re.split(r"[\n;]+", context)
-            if line.strip() and not line.startswith("[Source")
-        ]
+        if "Context information:" not in user:
+            return "The offline demo model cannot answer without retrieved context. Configure a provider for real QA."
+        context = user.split("Context information:", 1)[1].split("User question:", 1)[0].strip()
+        lines = [line.strip() for line in context.splitlines() if line.strip() and not line.startswith("[Source")]
         if not lines:
-            return ""
-
-        windows = []
-        for i, line in enumerate(lines):
-            windows.append(line)
-            if i + 1 < len(lines):
-                windows.append(f"{line} {lines[i + 1]}")
-            if i + 2 < len(lines):
-                windows.append(f"{line} {lines[i + 1]} {lines[i + 2]}")
-
-        def score(text: str) -> tuple[float, int]:
-            tokens = set(re.findall(r"[a-zA-Z0-9]+", text.lower()))
-            overlap = len(query_tokens & tokens)
-            numeric_bonus = 1 if re.search(r"\d", text) else 0
-            risk_penalty = 1 if "risk factor" in text.lower() and "risk" not in query_tokens else 0
-            phrase_bonus = 0.5 if any(phrase in text.lower() for phrase in ("driven by", "included in", "compared with")) else 0.0
-            return (overlap + numeric_bonus * 0.5 + phrase_bonus - risk_penalty, len(text))
-
-        best = max(windows, key=score)
-        return DemoChatModel._focused_excerpt(best, query_tokens)
-
-    @staticmethod
-    def _focused_excerpt(text: str, query_tokens: set[str], max_chars: int = 240) -> str:
-        if len(text) <= max_chars:
-            return text
-        lowered = text.lower()
-        broad_tokens = {"2021", "2022", "2023", "annual", "fiscal", "report", "reported", "year"}
-        focused_tokens = query_tokens - broad_tokens
-        generic_metric_tokens = {"major", "ratio", "source", "sources"}
-        preferred_tokens = focused_tokens - generic_metric_tokens
-        positions = [lowered.find(token) for token in preferred_tokens if lowered.find(token) >= 0]
-        if not positions:
-            positions = [lowered.find(token) for token in focused_tokens if lowered.find(token) >= 0]
-        if not positions:
-            positions = [lowered.find(token) for token in query_tokens if lowered.find(token) >= 0]
-        if not positions:
-            return text[:max_chars]
-        start = max(min(positions) - 60, 0)
-        end = min(start + max_chars, len(text))
-        return text[start:end].strip()
-
-    @staticmethod
-    def _evidence_supports_question(evidence: str, question: str) -> bool:
-        if not evidence:
-            return False
-        question_lower = question.lower()
-        evidence_lower = evidence.lower()
-        metric_terms = {
-            token
-            for token in re.findall(r"[a-zA-Z]+", question_lower)
-            if token
-            in {
-                "assets",
-                "coverage",
-                "income",
-                "liquidity",
-                "margin",
-                "ratio",
-                "revenue",
-                "sales",
-                "yield",
-            }
-        }
-        if metric_terms:
-            has_specific_metric_term = bool((metric_terms - {"ratio"}) & set(re.findall(r"[a-zA-Z]+", evidence_lower)))
-            return has_specific_metric_term and bool(re.search(r"\d", evidence))
-        return True
-
-
-
-
+            return "The retrieved context is insufficient to answer this question. [Source: retrieved context]"
+        excerpt = lines[0][:240]
+        return f"Offline demo excerpt: {excerpt}. [Source: retrieved context]"

@@ -51,8 +51,13 @@ def test_financial_metapaths_validate_and_route_by_domain_terms():
     router = MetapathRouter()
 
     selected = router.select("Which sectors is Global Income Fund exposed to?", ["Global Income Fund"])
+    traced = router.select_with_trace("Which sectors is Global Income Fund exposed to?", ["Global Income Fund"])
 
     assert selected[0].name == "sector_exposure"
+    assert traced[0].spec.name == "sector_exposure"
+    assert "sector" in traced[0].matched_keywords or "sectors" in traced[0].matched_keywords
+    assert traced[0].as_trace()["reason"]
+    assert "compliance_chain" not in {selection.spec.name for selection in traced}
     assert FINANCIAL_METAPATHS["shared_sector"].steps[1].direction == "in"
 
 
@@ -103,6 +108,13 @@ async def test_graphrag_metapath_search_adds_explainable_context():
     assert contexts
     assert contexts[0].source_type == "metapath"
     assert contexts[0].metadata["metapath"] == "sector_exposure"
+    assert contexts[0].metadata["selection_trace"]["matched_keywords"]
+    assert contexts[0].metadata["path_edges"][0] == {
+        "source": "Global Income Fund",
+        "relation": "HOLDS",
+        "target": "Microsoft",
+    }
+    assert contexts[0].metadata["intermediate_entities"] == ["Microsoft"]
     assert "Global Income Fund -[HOLDS]-> Microsoft" in contexts[0].content
 
 
@@ -689,7 +701,7 @@ async def test_factoid_intent_uses_tight_retrieval():
     )
 
     assert store.top_ks == [6]
-    assert len(contexts) == 3
+    assert len(contexts) == 5
 
 
 @pytest.mark.asyncio
@@ -852,6 +864,29 @@ def test_start_watching_stores_observer_and_stop_watching(monkeypatch):
     assert observer.stopped is True
     assert observer.joined is True
     assert agent._observer is None
+
+
+def test_doc_parser_normalizes_pdf_mojibake():
+    raw = (
+        "Return on common equity (\u00e2ROE\u00e2) 17 %\n"
+        "\u00e2\u00a2The Firm\u00e2s nonperforming assets increased."
+    )
+
+    cleaned = DocParserAgent._normalize_extracted_text(raw)
+
+    assert '"ROE"' in cleaned
+    assert "- The Firm's nonperforming assets" in cleaned
+    assert "\u00e2" not in cleaned
+
+
+def test_chunking_normalizes_extracted_text_before_indexing():
+    parser = DocParserAgent()
+    raw = "Firm Liquidity coverage ratio (\u00e2LCR\u00e2) (average)(b) 113 112 111"
+
+    chunks = parser._chunk_texts([raw], "doc", DocType.PDF, "jpmorgan.pdf")
+
+    assert chunks[0].content == 'Firm Liquidity coverage ratio ("LCR") (average)(b) 113 112 111'
+    assert "\u00e2" not in chunks[0].content
 
 
 def test_sentence_aware_chunking_does_not_split_mid_word():

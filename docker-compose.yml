@@ -105,6 +105,7 @@ services:
     volumes:
       - ./backend:/app
       - uploads:/app/uploads
+      - ${USERPROFILE}/.aws:/root/.aws:ro
 
 volumes:
   neo4j_data:

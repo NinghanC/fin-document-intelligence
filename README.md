@@ -415,7 +415,7 @@ The prototype keeps these paths explicit instead of asking a model to invent the
 - Rule-based routing is easier to audit than a learned router when the labeled retrieval set is still small.
 - Learned routing or HAN-style metapath attention only makes sense after the graph ontology is stable and a labeled retrieval benchmark exists.
 
-Implementation-wise, `MetapathRouter` selects candidate paths from query terms such as `sector`, `geographic`, `supplier`, `technology`, or `compliance`. `KnowledgeGraphService.traverse_metapath()` then walks the typed path in Neo4j or the in-memory graph fallback. `LogicalInferenceEngine` applies approved inference rules on top of those typed paths and emits `source_type="inference"` contexts. Matching paths and inferred facts are fused with vector, subgraph, path, and community evidence through RRF.
+Implementation-wise, `MetapathRouter` selects candidate paths from query terms such as `sector`, `geographic`, `supplier`, `technology`, or `compliance`, and emits a trace with matched keywords, selection reason, and fallback status. `KnowledgeGraphService.traverse_metapath()` then walks the typed path in Neo4j or the in-memory graph fallback. Metapath contexts include structured path edges, intermediate entities, start/end entities, and router trace metadata so graph evidence can be audited. `LogicalInferenceEngine` applies approved inference rules on top of those typed paths and emits `source_type="inference"` contexts. Matching paths and inferred facts are fused with vector, subgraph, path, and community evidence through RRF.
 
 Example:
 
@@ -469,11 +469,13 @@ Portfolio -> holds -> Company -> located_in -> Region
 Company -> belongs_to -> Sector <- belongs_to <- Company
 ```
 
-`run_metapath_eval.py` and `run_real_holdings_eval.py` build in-memory graphs, run `MetapathRouter`, traverse the expected typed paths, and report:
+`run_metapath_eval.py` and `run_real_holdings_eval.py` build in-memory graphs, run `MetapathRouter`, and report routed and oracle path metrics separately:
 
-- router hit rate
-- path hit rate
-- average end-entity recall
+- router hit rate: whether the rule router selected the expected metapath
+- routed path hit rate / routed end-entity recall: whether the selected metapaths reach the expected entities
+- oracle path hit rate / oracle end-entity recall: whether the graph can reach expected entities when the labeled metapath is supplied
+
+This split avoids circular scoring. Oracle traversal validates graph data and typed traversal; routed traversal validates the end-to-end metapath retrieval path that a user query actually exercises.
 
 This complements the public-document API benchmark. The public filings test source and evidence retrieval only; the synthetic metapath benchmark tests full graph-pattern coverage; the real-holdings benchmark tests whether those patterns work on a public-finance data shape.
 
@@ -492,7 +494,9 @@ python bench/run_live_eval.py \
   --output bench/live_eval/results.local.json
 ```
 
-`bench/live_eval/questions.json` contains finance questions with expected source files, expected evidence terms, expected answer points, and insufficient-evidence cases. The runner reports:
+`bench/live_eval/questions.json` is scoped to provider-backed answer grounding. It contains public filing questions, table-grounded questions, and insufficient-evidence cases with expected source files, expected evidence terms, and expected answer points. It intentionally excludes graph-inference/metapath questions; those are measured by `run_metapath_eval.py` and `run_real_holdings_eval.py`, where path reachability and end-entity recall are the primary metrics.
+
+The live runner reports:
 
 - pass rate
 - source hit rate
@@ -501,7 +505,7 @@ python bench/run_live_eval.py \
 - insufficient-evidence hit rate
 - per-answer-type breakdown
 
-If the API is already configured with provider credentials but the local shell does not expose `OPENAI_API_KEY`, pass `--allow-demo` to skip the local environment guard. Do not report deterministic demo-model output as live provider evaluation; it is useful for wiring checks only.
+If the API is already configured with provider credentials but the local shell does not expose `OPENAI_API_KEY`, pass `--allow-demo` to skip the local environment guard. Do not report deterministic demo-model output as live provider evaluation; it is useful for wiring checks only. Reported answer-quality numbers should come from a real provider such as AWS Bedrock, Azure OpenAI, or Databricks-hosted OpenAI-compatible endpoints.
 #### Optional Live LLM Smoke Tests
 
 Most automated tests use the deterministic demo model so CI can run without provider credentials. That proves orchestration, parsing, retrieval, graph traversal, and API behavior, but it does not prove a real LLM follows the prompts.

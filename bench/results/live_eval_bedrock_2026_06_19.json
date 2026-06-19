@@ -1,0 +1,140 @@
+{
+  "evaluation": "live_provider_answer_grounding",
+  "note": "Requires a real provider-backed API. Scores answer points and source grounding; deterministic demo-model results should not be reported as live eval.",
+  "summary": {
+    "total": 8,
+    "pass_rate": 0.75,
+    "source_hit_rate": 0.875,
+    "evidence_hit_rate": 0.75,
+    "answer_point_hit_rate": 0.75,
+    "insufficient_hit_rate": 1.0,
+    "by_answer_type": {
+      "factoid": {
+        "total": 3,
+        "pass_rate": 1.0,
+        "source_hit_rate": 1.0,
+        "evidence_hit_rate": 1.0,
+        "answer_point_hit_rate": 1.0
+      },
+      "graph_inference": {
+        "total": 2,
+        "pass_rate": 0.5,
+        "source_hit_rate": 0.5,
+        "evidence_hit_rate": 0.5,
+        "answer_point_hit_rate": 0.5
+      },
+      "insufficient": {
+        "total": 1,
+        "pass_rate": 1.0,
+        "source_hit_rate": 1.0,
+        "evidence_hit_rate": 1.0,
+        "answer_point_hit_rate": 1.0
+      },
+      "table": {
+        "total": 2,
+        "pass_rate": 0.5,
+        "source_hit_rate": 1.0,
+        "evidence_hit_rate": 0.5,
+        "answer_point_hit_rate": 0.5
+      }
+    }
+  },
+  "items": [
+    {
+      "id": "jpm_lcr_2023",
+      "answer_type": "factoid",
+      "question": "What liquidity coverage ratio did JPMorgan Chase report for 2023?",
+      "source_hit": true,
+      "evidence_hit": true,
+      "answer_point_hit": true,
+      "insufficient_hit": true,
+      "passed": true,
+      "retrieval_quality": 0.9,
+      "intent": "factoid"
+    },
+    {
+      "id": "msft_revenue_drivers_2023",
+      "answer_type": "factoid",
+      "question": "What major business segments did Microsoft report revenue for in fiscal 2023?",
+      "source_hit": true,
+      "evidence_hit": true,
+      "answer_point_hit": true,
+      "insufficient_hit": true,
+      "passed": true,
+      "retrieval_quality": 0.9,
+      "intent": "factoid"
+    },
+    {
+      "id": "msft_product_revenue_lines_2023",
+      "answer_type": "table",
+      "question": "Which product and service revenue lines did Microsoft mention for fiscal 2023?",
+      "source_hit": true,
+      "evidence_hit": false,
+      "answer_point_hit": false,
+      "insufficient_hit": true,
+      "passed": false,
+      "retrieval_quality": 0.9,
+      "intent": "factoid"
+    },
+    {
+      "id": "apple_deferred_revenue_2023",
+      "answer_type": "factoid",
+      "question": "How much revenue did Apple recognize in 2023 that was included in deferred revenue as of September 24, 2022?",
+      "source_hit": true,
+      "evidence_hit": true,
+      "answer_point_hit": true,
+      "insufficient_hit": true,
+      "passed": true,
+      "retrieval_quality": 0.62,
+      "intent": "factoid"
+    },
+    {
+      "id": "fund_sector_inference",
+      "answer_type": "graph_inference",
+      "question": "Infer which sector Global Income Fund is exposed to through its holdings.",
+      "source_hit": false,
+      "evidence_hit": false,
+      "answer_point_hit": false,
+      "insufficient_hit": true,
+      "passed": false,
+      "retrieval_quality": 1.0,
+      "intent": "factoid"
+    },
+    {
+      "id": "fund_supplier_dependency",
+      "answer_type": "graph_inference",
+      "question": "Which supplier dependency exposure can be inferred for Strategic Growth Fund?",
+      "source_hit": true,
+      "evidence_hit": true,
+      "answer_point_hit": true,
+      "insufficient_hit": true,
+      "passed": true,
+      "retrieval_quality": 1.0,
+      "intent": "factoid"
+    },
+    {
+      "id": "table_sector_exposure",
+      "answer_type": "table",
+      "question": "What technology exposure does Global Income Fund have in the uploaded exposure table?",
+      "source_hit": true,
+      "evidence_hit": true,
+      "answer_point_hit": true,
+      "insufficient_hit": true,
+      "passed": true,
+      "retrieval_quality": 1.0,
+      "intent": "factoid"
+    },
+    {
+      "id": "insufficient_private_metric",
+      "answer_type": "insufficient",
+      "question": "What was the private internal stress-loss limit approved by the risk committee?",
+      "source_hit": true,
+      "evidence_hit": true,
+      "answer_point_hit": true,
+      "insufficient_hit": true,
+      "passed": true,
+      "retrieval_quality": 0.9,
+      "intent": "factoid"
+    }
+  ]
+}

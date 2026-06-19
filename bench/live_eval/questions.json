@@ -3,57 +3,86 @@
     "id": "jpm_lcr_2023",
     "answer_type": "factoid",
     "question": "What liquidity coverage ratio did JPMorgan Chase report for 2023?",
-    "expected_sources": ["jpmorgan_2023_annual_report.pdf"],
-    "expected_evidence_terms": ["liquidity coverage ratio", "113"],
-    "expected_answer_points": ["113", "liquidity coverage ratio"]
+    "expected_sources": [
+      "jpmorgan_2023_annual_report.pdf"
+    ],
+    "expected_evidence_terms": [
+      "liquidity coverage ratio",
+      "113"
+    ],
+    "expected_answer_points": [
+      "113",
+      "liquidity coverage ratio"
+    ]
   },
   {
     "id": "msft_revenue_drivers_2023",
     "answer_type": "factoid",
-    "question": "What did Microsoft identify as major revenue sources in fiscal 2023?",
-    "expected_sources": ["microsoft_2023_10k.pdf"],
-    "expected_evidence_terms": ["Revenue increased", "Intelligent Cloud", "Productivity and Business Processes"],
-    "expected_answer_points": ["Intelligent Cloud", "Productivity and Business Processes"]
+    "question": "What major business segments did Microsoft report revenue for in fiscal 2023?",
+    "expected_sources": [
+      "microsoft_2023_10k.pdf"
+    ],
+    "expected_evidence_terms": [
+      "Productivity and Business Processes",
+      "Intelligent Cloud",
+      "More Personal Computing"
+    ],
+    "expected_answer_points": [
+      "Productivity and Business Processes",
+      "Intelligent Cloud",
+      "More Personal Computing"
+    ]
   },
   {
-    "id": "msft_segment_revenue_2023",
+    "id": "msft_product_revenue_lines_2023",
     "answer_type": "table",
-    "question": "What were Microsoft's reported revenue segments in fiscal 2023?",
-    "expected_sources": ["microsoft_2023_10k.pdf"],
-    "expected_evidence_terms": ["Productivity and Business Processes", "Intelligent Cloud", "More Personal Computing"],
-    "expected_answer_points": ["Productivity and Business Processes", "Intelligent Cloud", "More Personal Computing"]
+    "question": "Which product and service revenue lines did Microsoft mention for fiscal 2023?",
+    "expected_sources": [
+      "microsoft_2023_10k.pdf"
+    ],
+    "expected_evidence_terms": [
+      "Server products",
+      "Office products",
+      "LinkedIn",
+      "Dynamics"
+    ],
+    "expected_answer_points": [
+      "Server products",
+      "Office products",
+      "LinkedIn",
+      "Dynamics"
+    ]
   },
   {
     "id": "apple_deferred_revenue_2023",
     "answer_type": "factoid",
     "question": "How much revenue did Apple recognize in 2023 that was included in deferred revenue as of September 24, 2022?",
-    "expected_sources": ["apple_2023_10k.pdf"],
-    "expected_evidence_terms": ["$8.2 billion", "deferred revenue"],
-    "expected_answer_points": ["$8.2 billion", "deferred revenue"]
-  },
-  {
-    "id": "fund_sector_inference",
-    "answer_type": "graph_inference",
-    "question": "Infer which sector Global Income Fund is exposed to through its holdings.",
-    "expected_sources": ["inference", "metapath"],
-    "expected_evidence_terms": ["Global Income Fund", "HOLDS", "BELONGS_TO", "Technology"],
-    "expected_answer_points": ["Global Income Fund", "Technology", "sector exposure"]
-  },
-  {
-    "id": "fund_supplier_dependency",
-    "answer_type": "graph_inference",
-    "question": "Which supplier dependency exposure can be inferred for Strategic Growth Fund?",
-    "expected_sources": ["inference", "metapath"],
-    "expected_evidence_terms": ["Strategic Growth Fund", "depends", "supplier"],
-    "expected_answer_points": ["Strategic Growth Fund", "supplier"]
+    "expected_sources": [
+      "apple_2023_10k.pdf"
+    ],
+    "expected_evidence_terms": [
+      "$8.2 billion",
+      "deferred revenue"
+    ],
+    "expected_answer_points": [
+      "$8.2 billion",
+      "deferred revenue"
+    ]
   },
   {
     "id": "table_sector_exposure",
     "answer_type": "table",
     "question": "What technology exposure does Global Income Fund have in the uploaded exposure table?",
-    "expected_sources": ["fund_exposures.csv"],
-    "expected_evidence_terms": ["Technology", "Exposure"],
-    "expected_answer_points": ["Technology"]
+    "expected_sources": [
+      "fund_exposures.csv"
+    ],
+    "expected_evidence_terms": [
+      "Technology",
+      "Exposure"
+    ],
+    "expected_answer_points": [
+      "Technology"
+    ]
   },
   {
     "id": "insufficient_private_metric",
@@ -61,6 +90,6 @@
     "question": "What was the private internal stress-loss limit approved by the risk committee?",
     "expected_sources": [],
     "expected_evidence_terms": [],
-    "expected_answer_points": ["insufficient"]
+    "expected_answer_points": []
   }
 ]

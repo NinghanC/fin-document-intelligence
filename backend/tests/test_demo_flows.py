@@ -94,7 +94,7 @@ async def test_hash_embeddings_make_vector_demo_searchable():
     assert any(value != 0 for value in query)
 
 
-def test_demo_model_answer_selects_relevant_metric_line():
+def test_demo_model_returns_generic_offline_excerpt():
     context = """\
 [Source 1: northstar_bank.pdf | Type: vector | Score: 0.95]
 Liquidity risk management overview
@@ -104,101 +104,24 @@ Liquidity coverage ratio was 113% for Northstar Bank in 2023.
         f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did Northstar Bank report for 2023?"
     )
 
-    assert "Liquidity coverage ratio" in answer
-    assert "113" in answer
+    assert answer.startswith("Offline demo excerpt: Liquidity risk management overview")
+    assert "113" not in answer
 
 
-def test_demo_model_answer_focuses_long_table_excerpt_on_query_terms():
-    context = """\
-[Source 1: northstar_bank.pdf | Type: vector | Score: 0.95]
-Selected ratios and metrics Return on common equity 17 % Return on tangible common equity 21 % Return on assets 1.30 Overhead ratio 55 Loans-to-deposits ratio 55 Firm Liquidity coverage ratio (LCR) average 113 112 111.
-"""
-    answer = DemoChatModel._answer(
-        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did Northstar Bank report for 2023?"
-    )
+def test_demo_model_does_not_claim_answer_quality_without_context():
+    answer = DemoChatModel._answer("User question: What liquidity coverage ratio did Northstar Bank report?")
 
-    assert "Liquidity coverage ratio" in answer
-    assert "113" in answer
+    assert "cannot answer without retrieved context" in answer.lower()
 
 
-def test_demo_model_says_insufficient_when_metric_context_is_truncated():
-    context = """\
-[Source 1: northstar_bank.pdf | Type: vector | Score: 0.95]
-Selected ratios and metrics Return on common equity 17 % Return on assets 1.30 Overhead ratio 55 59 59 Lo.
-"""
-    answer = DemoChatModel._answer(
-        f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did Northstar Bank report for 2023?"
-    )
+def test_demo_model_extracts_no_synthetic_financial_relations():
+    result = DemoChatModel()._extract("Global Income Fund monitors duration risk and liquidity buffer.")
 
-    assert "insufficient" in answer.lower()
-
-
-def test_demo_model_answer_prefers_revenue_window_over_generic_risk_line():
-    context = """\
-[Source 1: cloudware.pdf | Type: vector | Score: 0.95]
-Refer to Risk Factors in our fiscal year 2023 Form 10-K for a discussion of these factors.
-Fiscal Year 2023 Compared with Fiscal Year 2022
-Revenue increased $13.6 billion or 7% driven by growth in Intelligent Cloud and Productivity and Business Processes.
-"""
-    answer = DemoChatModel._answer(
-        f"Context information:\n{context}\n\nUser question: What did Cloudware identify as major revenue sources in fiscal 2023?"
-    )
-
-    assert "Revenue increased $13.6 billion or 7%" in answer
-    assert "Intelligent Cloud and Productivity and Business Processes" in answer
-
-
-def test_demo_model_surfaces_segment_revenue_table_evidence():
-    context = """\
-[Source 1: cloudware.pdf | Type: vector | Score: 0.95]
-Revenue
-Productivity and Business Processes  $ 69,274   $ 63,364   $ 53,915
-Intelligent Cloud   87,907    74,965    59,728
-More Personal Computing   54,734    59,941    54,445
-Total  $ 211,915   $ 198,270   $ 168,088
-"""
-    answer = DemoChatModel._answer(
-        f"Context information:\n{context}\n\nUser question: What were Cloudware's reported revenue segments in fiscal 2023?"
-    )
-
-    assert "Productivity and Business Processes" in answer
-    assert "Intelligent Cloud" in answer
-
-
-def test_demo_model_surfaces_deferred_revenue_evidence():
-    context = """\
-[Source 1: apex_devices.pdf | Type: vector | Score: 0.95]
-Total net sales include $8.2 billion of revenue recognized in 2023 that was included in deferred revenue as of September 24, 2022.
-"""
-    answer = DemoChatModel._answer(
-        "Context information:\n"
-        f"{context}\n\n"
-        "User question: How much revenue did Apex Devices recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
-    )
-
-    assert "$8.2 billion of revenue recognized in 2023" in answer
-
-
-def test_demo_model_prefers_deferred_revenue_over_distractors():
-    context = """\
-[Source 1: distractor.pdf | Type: vector | Score: 1.00]
-Our cloud revenue was $111.6 billion in fiscal year 2023.
-
-[Source 2: apex_devices.pdf | Type: vector | Score: 0.95]
-Total net sales include $8.2 billion of revenue recognized in 2023 that was included in deferred revenue as of September 24, 2022, $7.5 billion of revenue recognized in 2022.
-"""
-    answer = DemoChatModel._answer(
-        "Context information:\n"
-        f"{context}\n\n"
-        "User question: How much revenue did Apex Devices recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
-    )
-
-    assert "$8.2 billion of revenue recognized in 2023" in answer
+    assert result["relations"] == []
 
 
 def test_demo_model_classifies_how_much_as_factoid():
     assert DemoChatModel._classify_intent("How much revenue did Apex Devices recognize?") == "factoid"
-
 
 @pytest.mark.asyncio
 async def test_qa_uses_graphrag_and_returns_retrieval_quality_and_sources():
@@ -227,17 +150,12 @@ async def test_graphrag_pipeline_returns_vector_and_graph_contexts():
 
 @pytest.mark.asyncio
 async def test_memory_knowledge_graph_supports_neighbors_and_stats():
-    graph = KnowledgeGraphService()
-    extractor = KnowledgeExtractAgent()
-    extraction = await extractor.extract_single(
-        "Global Income Fund has duration risk and a liquidity buffer.",
-        chunk_id="fund-report#chunk-0",
-    )
+    from agents.knowledge_extract_agent import Entity, Relation
 
-    for entity in extraction.entities:
-        await graph.upsert_entity(entity, source=extraction.source_chunk_id)
-    for relation in extraction.relations:
-        await graph.add_relation(relation, source=extraction.source_chunk_id)
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Global Income Fund", "Fund"), source="fund-report#chunk-0")
+    await graph.upsert_entity(Entity("duration risk", "RiskFactor"), source="fund-report#chunk-0")
+    await graph.add_relation(Relation("Global Income Fund", "related_to", "duration risk"), source="fund-report#chunk-0")
 
     neighbors = await graph.get_neighbors("Global Income Fund")
     stats = await graph.get_stats()
@@ -285,7 +203,7 @@ async def test_cdc_processor_tracks_versions_and_diff():
 
 
 @pytest.mark.asyncio
-async def test_doc_parser_text_and_extractor_demo_model(tmp_path):
+async def test_doc_parser_text_and_offline_extractor_do_not_fake_relations(tmp_path):
     report = tmp_path / "fund-report.txt"
     report.write_text("Global Income Fund monitors duration risk and liquidity buffer.", encoding="utf-8")
 
@@ -293,7 +211,7 @@ async def test_doc_parser_text_and_extractor_demo_model(tmp_path):
     extraction = await KnowledgeExtractAgent().extract(chunks)
 
     assert chunks[0].doc_type == DocType.TEXT
-    assert any(entity.name == "Global Income Fund" for item in extraction for entity in item.entities)
+    assert all(not item.relations for item in extraction)
 
 
 @pytest.mark.asyncio

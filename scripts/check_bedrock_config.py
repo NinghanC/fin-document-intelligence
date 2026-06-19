@@ -78,6 +78,9 @@ def _credentials_available(env: dict[str, str]) -> bool:
     profile = env.get("AWS_PROFILE", "").strip()
     if profile:
         session_kwargs["profile_name"] = profile
+    else:
+        os.environ.pop("AWS_PROFILE", None)
+        os.environ.pop("AWS_DEFAULT_PROFILE", None)
     session = boto3.Session(**session_kwargs)
     return session.get_credentials() is not None
 

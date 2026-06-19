@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     chroma_mode: str = "local"  # local | http
     chroma_host: str = "localhost"
     chroma_port: int = 8000
-    chroma_lexical_scan_limit: int = 1000
+    chroma_lexical_scan_limit: int = 5000
     pgvector_dsn: str = "postgresql://postgres:postgres@localhost:5432/knowledge"
     disable_local_embeddings: bool = False
 

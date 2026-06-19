@@ -330,30 +330,53 @@ class VectorStoreService:
         metadata: dict[str, Any],
         vector_score: float,
     ) -> tuple[dict, float]:
-        lexical_score = cls._lexical_score(query, content)
-        score = min(1.0, max((vector_score * 0.55) + (lexical_score * 0.45), lexical_score * 0.9))
+        content_lexical_score = cls._lexical_score(query, content)
+        metadata_score = cls._metadata_score(query, metadata)
+        score = min(
+            1.0,
+            max(
+                (vector_score * 0.55) + (content_lexical_score * 0.35) + (metadata_score * 0.10),
+                content_lexical_score * 0.9,
+                metadata_score * 0.25,
+            ),
+        )
         return (
             {
                 "content": content,
                 "source": metadata.get("source", ""),
-                "metadata": {**metadata, "vector_score": vector_score, "lexical_score": lexical_score},
+                "metadata": {
+                    **metadata,
+                    "vector_score": vector_score,
+                    "lexical_score": content_lexical_score,
+                    "metadata_score": metadata_score,
+                },
             },
             round(score, 6),
         )
 
+    @classmethod
+    def _metadata_score(cls, query: str, metadata: dict[str, Any]) -> float:
+        metadata_text = " ".join(
+            str(metadata.get(key, ""))
+            for key in ("source", "doc_id", "doc_type")
+        )
+        return cls._lexical_score(query, metadata_text)
+
+    @classmethod
+    def _lexical_score(cls, query: str, content: str) -> float:
+        query_tokens = cls._query_tokens(query)
+        if not query_tokens:
+            return 0.0
+        content_tokens = set(re.findall(r"[a-zA-Z0-9]+", content.lower()))
+        return len(query_tokens & content_tokens) / len(query_tokens)
+
     @staticmethod
-    def _lexical_score(query: str, content: str) -> float:
-        query_tokens = {
+    def _query_tokens(query: str) -> set[str]:
+        return {
             token
             for token in re.findall(r"[a-zA-Z0-9]+", query.lower())
             if len(token) >= 3 and token not in {"and", "for", "the", "their", "what", "which", "did"}
         }
-        if not query_tokens:
-            return 0.0
-        content_tokens = set(re.findall(r"[a-zA-Z0-9]+", content.lower()))
-        overlap = len(query_tokens & content_tokens) / len(query_tokens)
-        exact_phrase_bonus = 0.15 if query.lower() in content.lower() else 0.0
-        return min(1.0, overlap + exact_phrase_bonus)
 
     async def delete_by_doc_id(self, doc_id: str) -> int:
         """Delete all related vectors by doc_id"""

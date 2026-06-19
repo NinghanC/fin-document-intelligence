@@ -5,7 +5,7 @@ network access. It complements the synthetic metapath benchmark by using a data
 shape closer to public holdings disclosures.
 
 Run:
-    PYTHONPATH=backend python bench/run_real_holdings_eval.py
+    python bench/run_real_holdings_eval.py
 """
 
 from __future__ import annotations
@@ -14,12 +14,18 @@ import argparse
 import asyncio
 import csv
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
-from agents.knowledge_extract_agent import Entity, Relation
-from services.knowledge_graph import KnowledgeGraphService
-from services.metapaths import FINANCIAL_METAPATHS, MetapathRouter
+ROOT = Path(__file__).resolve().parents[1]
+BACKEND = ROOT / "backend"
+if str(BACKEND) not in sys.path:
+    sys.path.insert(0, str(BACKEND))
+
+from agents.knowledge_extract_agent import Entity, Relation  # noqa: E402
+from services.knowledge_graph import KnowledgeGraphService  # noqa: E402
+from services.metapaths import FINANCIAL_METAPATHS, MetapathRouter  # noqa: E402
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -64,42 +70,69 @@ async def _build_graph(rows: list[dict[str, str]]) -> KnowledgeGraphService:
     return graph
 
 
+async def _traverse_selected(
+    graph: KnowledgeGraphService,
+    start_entities: list[str],
+    metapath_names: list[str],
+) -> tuple[list[str], dict[str, list[str]]]:
+    reached_by_metapath: dict[str, list[str]] = {}
+    reached: set[str] = set()
+    for name in metapath_names:
+        paths = await graph.traverse_metapath(start_entities, FINANCIAL_METAPATHS[name])
+        end_entities = sorted({result.end_entity for result in paths})
+        reached_by_metapath[name] = end_entities
+        reached.update(end_entities)
+    return sorted(reached), reached_by_metapath
+
+
 async def _evaluate(rows: list[dict[str, str]], questions: list[dict[str, Any]]) -> dict[str, Any]:
     graph = await _build_graph(rows)
     router = MetapathRouter()
     result_rows: list[dict[str, Any]] = []
 
     for question in questions:
-        selected = router.select(question["question"], question["start_entities"], limit=3)
-        selected_names = [spec.name for spec in selected]
+        selections = router.select_with_trace(question["question"], question["start_entities"], limit=3)
+        selected_names = [selection.spec.name for selection in selections]
         expected_metapath = question["expected_metapath"]
-        spec = FINANCIAL_METAPATHS[expected_metapath]
-        paths = await graph.traverse_metapath(question["start_entities"], spec)
-        reached = sorted({result.end_entity for result in paths})
+        oracle_paths = await graph.traverse_metapath(question["start_entities"], FINANCIAL_METAPATHS[expected_metapath])
+        oracle_reached = sorted({result.end_entity for result in oracle_paths})
+        routed_reached, reached_by_selected = await _traverse_selected(graph, question["start_entities"], selected_names)
         expected = set(question["expected_end_entities"])
-        recall = len(expected & set(reached)) / max(len(expected), 1)
+        oracle_recall = len(expected & set(oracle_reached)) / max(len(expected), 1)
+        routed_recall = len(expected & set(routed_reached)) / max(len(expected), 1)
         result_rows.append({
             "question": question["question"],
             "expected_metapath": expected_metapath,
             "selected_metapaths": selected_names,
+            "router_trace": [selection.as_trace() for selection in selections],
             "router_hit": expected_metapath in selected_names,
             "expected_end_entities": sorted(expected),
-            "reached_end_entities": reached,
-            "path_recall": round(recall, 3),
-            "path_hit": recall == 1.0,
+            "routed_reached_end_entities": routed_reached,
+            "oracle_reached_end_entities": oracle_reached,
+            "reached_by_selected_metapath": reached_by_selected,
+            "routed_path_recall": round(routed_recall, 3),
+            "oracle_path_recall": round(oracle_recall, 3),
+            "routed_path_hit": routed_recall == 1.0,
+            "oracle_path_hit": oracle_recall == 1.0,
         })
 
     total = len(result_rows)
     router_hits = sum(1 for row in result_rows if row["router_hit"])
-    path_hits = sum(1 for row in result_rows if row["path_hit"])
-    average_recall = sum(float(row["path_recall"]) for row in result_rows) / max(total, 1)
+    routed_path_hits = sum(1 for row in result_rows if row["routed_path_hit"])
+    oracle_path_hits = sum(1 for row in result_rows if row["oracle_path_hit"])
+    average_routed_recall = sum(float(row["routed_path_recall"]) for row in result_rows) / max(total, 1)
+    average_oracle_recall = sum(float(row["oracle_path_recall"]) for row in result_rows) / max(total, 1)
     return {
         "dataset": "real_13f_style_holdings_sample",
         "holdings_rows": len(rows),
         "questions": total,
         "router_hit_rate": round(router_hits / max(total, 1), 3),
-        "path_hit_rate": round(path_hits / max(total, 1), 3),
-        "average_path_recall": round(average_recall, 3),
+        "routed_path_hit_rate": round(routed_path_hits / max(total, 1), 3),
+        "average_routed_path_recall": round(average_routed_recall, 3),
+        "oracle_path_hit_rate": round(oracle_path_hits / max(total, 1), 3),
+        "average_oracle_path_recall": round(average_oracle_recall, 3),
+        "path_hit_rate": round(routed_path_hits / max(total, 1), 3),
+        "average_path_recall": round(average_routed_recall, 3),
         "rows": result_rows,
     }
 

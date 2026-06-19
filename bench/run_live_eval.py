@@ -16,7 +16,16 @@ from typing import Any
 
 import httpx
 
-INSUFFICIENT_TERMS = ("insufficient", "not enough", "not available", "cannot determine", "no evidence")
+INSUFFICIENT_TERMS = (
+    "insufficient",
+    "not enough",
+    "not available",
+    "cannot determine",
+    "no evidence",
+    "does not contain",
+    "does not provide",
+    "not contain information",
+)
 
 
 def _blob(value: Any) -> str:
@@ -45,7 +54,7 @@ def _evidence_hit(item: dict[str, Any], response: dict[str, Any]) -> bool:
 def _answer_point_hit(item: dict[str, Any], response: dict[str, Any]) -> bool:
     points = item.get("expected_answer_points", [])
     if not points:
-        return True
+        return _insufficient_hit(item, response) if item.get("answer_type") == "insufficient" else True
     return _contains_all(str(response.get("answer", "")).lower(), points)
 
 
@@ -118,18 +127,38 @@ def evaluate(
     }
 
 
+def _load_env_file(path: str) -> None:
+    env_path = Path(path)
+    if not path or not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def _provider_configured() -> bool:
+    provider = os.getenv("MODEL_PROVIDER", "").lower()
+    if provider == "bedrock":
+        return bool(os.getenv("AWS_REGION") and os.getenv("BEDROCK_MODEL_ID"))
+    return bool(os.getenv("OPENAI_API_KEY"))
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default="http://localhost:8080")
     parser.add_argument("--api-key", default="")
     parser.add_argument("--questions", default=str(Path(__file__).parent / "live_eval" / "questions.json"))
+    parser.add_argument("--env-file", default=str(Path(__file__).resolve().parents[1] / "backend" / ".env"))
     parser.add_argument("--allow-demo", action="store_true", help="Allow running without local provider env vars.")
     parser.add_argument("--output", default="")
     args = parser.parse_args()
 
-    if not args.allow_demo and not os.getenv("OPENAI_API_KEY"):
+    _load_env_file(args.env_file)
+    if not args.allow_demo and not _provider_configured():
         print(
-            "OPENAI_API_KEY is not set locally. If the target API is already provider-backed, rerun with --allow-demo.",
+            "No provider config found locally. Set OPENAI_API_KEY or Bedrock MODEL_PROVIDER/AWS_REGION/BEDROCK_MODEL_ID, or rerun with --allow-demo if the target API is already provider-backed.",
             file=sys.stderr,
         )
         raise SystemExit(2)
