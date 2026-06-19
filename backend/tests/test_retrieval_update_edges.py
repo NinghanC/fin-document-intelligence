@@ -357,7 +357,7 @@ async def test_graphrag_entity_linking_uses_alias_and_fuzzy_match():
             return []
 
     graph = KnowledgeGraphService()
-    await graph.upsert_entity(Entity("Microsoft", "Organization"))
+    await graph.upsert_entity(Entity("Microsoft", "Organization", properties={"ticker": "MSFT", "aliases": ["Microsoft Corp", "Microsoft Corporation"]}))
 
     pipeline = GraphRAGPipeline(VectorStore(), graph)
 
@@ -1017,3 +1017,4 @@ def test_ingestion_registry_dead_letters_failed_records(tmp_path, monkeypatch):
     assert dead_letters[0]["doc_id"] == "failed-doc"
     assert dead_letters[0]["error"] == "vector store unavailable"
     assert dead_letters[0]["retry_count"] == 1
+

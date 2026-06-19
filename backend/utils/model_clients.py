@@ -152,20 +152,16 @@ class DemoChatModel:
         if "Context information:" in user:
             context = user.split("Context information:", 1)[1].split("User question:", 1)[0].strip()
             question = user.split("User question:", 1)[-1]
-            direct_factoid = DemoChatModel._format_factoid_answer(context, question)
-            if direct_factoid:
-                return f"{direct_factoid} [Source: retrieved context]"
+
             evidence = DemoChatModel._best_evidence_line(context, question)
             if not DemoChatModel._evidence_supports_question(evidence, question):
                 return (
                     "The retrieved context is truncated or insufficient to answer this question reliably. "
                     "[Source: retrieved context]"
                 )
-            factoid = DemoChatModel._format_factoid_answer(evidence, question)
-            if factoid:
-                return f"{factoid} [Source: retrieved context]"
+
             return (
-                "Based on the retrieved fund-document context, "
+                "Based on the retrieved context, "
                 f"{evidence or 'the available evidence supports the answer'}. "
                 "[Source: retrieved context]"
             )
@@ -199,23 +195,8 @@ class DemoChatModel:
             overlap = len(query_tokens & tokens)
             numeric_bonus = 1 if re.search(r"\d", text) else 0
             risk_penalty = 1 if "risk factor" in text.lower() and "risk" not in query_tokens else 0
-            revenue_source_bonus = 0.0
-            if {"revenue", "sources"} & query_tokens:
-                lowered = text.lower()
-                if "driven by" in lowered:
-                    revenue_source_bonus += 2.0
-                if "deferred revenue" in lowered and re.search(r"\$\s*\d+(?:\.\d+)?\s*billion", lowered):
-                    revenue_source_bonus += 4.0
-                if all(
-                    term in lowered
-                    for term in ("productivity and business processes", "intelligent cloud", "more personal computing")
-                ):
-                    revenue_source_bonus += 4.0
-                elif all(term in lowered for term in ("productivity", "intelligent cloud")):
-                    revenue_source_bonus += 2.0
-                if "geographic" in lowered or "seasonality" in lowered:
-                    revenue_source_bonus -= 1.0
-            return (overlap + numeric_bonus * 0.5 + revenue_source_bonus - risk_penalty, len(text))
+            phrase_bonus = 0.5 if any(phrase in text.lower() for phrase in ("driven by", "included in", "compared with")) else 0.0
+            return (overlap + numeric_bonus * 0.5 + phrase_bonus - risk_penalty, len(text))
 
         best = max(windows, key=score)
         return DemoChatModel._focused_excerpt(best, query_tokens)
@@ -263,87 +244,10 @@ class DemoChatModel:
             }
         }
         if metric_terms:
-            if "revenue" in metric_terms and all(
-                term in evidence_lower
-                for term in ("productivity and business processes", "intelligent cloud", "more personal computing")
-            ):
-                return bool(re.search(r"\d", evidence))
             has_specific_metric_term = bool((metric_terms - {"ratio"}) & set(re.findall(r"[a-zA-Z]+", evidence_lower)))
             return has_specific_metric_term and bool(re.search(r"\d", evidence))
         return True
 
-    @staticmethod
-    def _format_factoid_answer(evidence: str, question: str) -> str:
-        evidence_clean = re.sub(r"\s+", " ", evidence).strip()
-        question_lower = question.lower()
-        subject = DemoChatModel._question_subject(question)
-        if "liquidity coverage ratio" in question_lower:
-            match = re.search(
-                r"liquidity coverage ratio.*?(?P<value>\d{2,3})(?:\s+\d{2,3}){0,2}",
-                evidence_clean,
-                flags=re.IGNORECASE,
-            )
-            if match:
-                return (
-                    f"{subject} reported an average liquidity coverage ratio "
-                    f"of {match.group('value')}% for 2023."
-                )
-        revenue_match = re.search(
-            r"revenue increased (?P<amount>\$?\d+(?:\.\d+)?\s*billion).*?driven by (?P<drivers>[^.]+)",
-            evidence_clean,
-            flags=re.IGNORECASE,
-        )
-        if "revenue" in question_lower and revenue_match:
-            return (
-                f"{subject} reported that fiscal 2023 revenue increased "
-                f"{revenue_match.group('amount')}, driven by {revenue_match.group('drivers').strip()}."
-            )
-        if "revenue" in question_lower:
-            segment_match = re.search(
-                r"Productivity and Business Processes\s+\$\s*(?P<productivity>[\d,]+).*?"
-                r"Intelligent Cloud\s+(?P<cloud>[\d,]+).*?"
-                r"More Personal Computing\s+(?P<personal>[\d,]+)",
-                evidence_clean,
-                flags=re.IGNORECASE,
-            )
-            if segment_match:
-                return (
-                    f"{subject} reported fiscal 2023 revenue by segment as "
-                    f"Productivity and Business Processes ${segment_match.group('productivity')} million, "
-                    f"Intelligent Cloud ${segment_match.group('cloud')} million, and "
-                    f"More Personal Computing ${segment_match.group('personal')} million."
-                )
-        if "deferred revenue" in question_lower:
-            deferred_match = re.search(
-                r"(?P<amount>\$\s*\d+(?:\.\d+)?\s*billion) of revenue recognized in 2023 .*?deferred revenue",
-                evidence_clean,
-                flags=re.IGNORECASE,
-            )
-            if deferred_match:
-                amount = re.sub(r"\$\s+", "$", deferred_match.group("amount"))
-                return (
-                    f"{subject} recognized "
-                    f"{amount} of revenue in 2023 that was included "
-                    "in deferred revenue as of September 24, 2022."
-                )
-        return ""
 
-    @staticmethod
-    def _question_subject(question: str) -> str:
-        """Best-effort subject label for deterministic offline answers."""
-        stop_phrases = {
-            "How",
-            "What",
-            "When",
-            "Where",
-            "Which",
-            "Who",
-            "Why",
-            "The",
-            "Did",
-        }
-        matches = re.findall(r"\b[A-Z][A-Za-z&.']+(?:\s+[A-Z][A-Za-z&.']+){0,4}\b", question)
-        candidates = [match.strip().removesuffix("'s") for match in matches if match.split()[0] not in stop_phrases]
-        if candidates:
-            return candidates[0]
-        return "The retrieved source"
+
+

@@ -52,13 +52,8 @@ Return JSON: {"entities": ["entity_1", "entities2"]}
 Return only JSON.
 """
 
-DEFAULT_ALIAS_TABLE = {
-    "msft": "Microsoft",
-    "microsoft corp": "Microsoft",
-    "microsoft corporation": "Microsoft",
-    "aapl": "Apple Inc",
-    "apple": "Apple Inc",
-}
+DEFAULT_ALIAS_TABLE: dict[str, str] = {}
+
 
 ENTITY_STOPWORDS = {
     "a",
@@ -566,3 +561,4 @@ class GraphRAGPipeline:
     def _dedup_key(content: str) -> str:
         words = sorted(set(re.findall(r"\w{4,}", content.lower())))
         return hashlib.md5(" ".join(words[:30]).encode(), usedforsecurity=False).hexdigest()
+

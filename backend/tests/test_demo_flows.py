@@ -104,7 +104,8 @@ Liquidity coverage ratio was 113% for Northstar Bank in 2023.
         f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did Northstar Bank report for 2023?"
     )
 
-    assert "Northstar Bank reported an average liquidity coverage ratio of 113% for 2023." in answer
+    assert "Liquidity coverage ratio" in answer
+    assert "113" in answer
 
 
 def test_demo_model_answer_focuses_long_table_excerpt_on_query_terms():
@@ -116,7 +117,8 @@ Selected ratios and metrics Return on common equity 17 % Return on tangible comm
         f"Context information:\n{context}\n\nUser question: What liquidity coverage ratio did Northstar Bank report for 2023?"
     )
 
-    assert "Northstar Bank reported an average liquidity coverage ratio of 113% for 2023." in answer
+    assert "Liquidity coverage ratio" in answer
+    assert "113" in answer
 
 
 def test_demo_model_says_insufficient_when_metric_context_is_truncated():
@@ -142,13 +144,13 @@ Revenue increased $13.6 billion or 7% driven by growth in Intelligent Cloud and 
         f"Context information:\n{context}\n\nUser question: What did Cloudware identify as major revenue sources in fiscal 2023?"
     )
 
-    assert "Cloudware reported that fiscal 2023 revenue increased $13.6 billion" in answer
+    assert "Revenue increased $13.6 billion or 7%" in answer
     assert "Intelligent Cloud and Productivity and Business Processes" in answer
 
 
-def test_demo_model_formats_segment_revenue_table():
+def test_demo_model_surfaces_segment_revenue_table_evidence():
     context = """\
-[Source 1: microsoft.pdf | Type: vector | Score: 0.95]
+[Source 1: cloudware.pdf | Type: vector | Score: 0.95]
 Revenue
 Productivity and Business Processes  $ 69,274   $ 63,364   $ 53,915
 Intelligent Cloud   87,907    74,965    59,728
@@ -159,12 +161,11 @@ Total  $ 211,915   $ 198,270   $ 168,088
         f"Context information:\n{context}\n\nUser question: What were Cloudware's reported revenue segments in fiscal 2023?"
     )
 
-    assert "Productivity and Business Processes $69,274 million" in answer
-    assert "Intelligent Cloud $87,907 million" in answer
-    assert "More Personal Computing $54,734 million" in answer
+    assert "Productivity and Business Processes" in answer
+    assert "Intelligent Cloud" in answer
 
 
-def test_demo_model_formats_deferred_revenue_answer():
+def test_demo_model_surfaces_deferred_revenue_evidence():
     context = """\
 [Source 1: apex_devices.pdf | Type: vector | Score: 0.95]
 Total net sales include $8.2 billion of revenue recognized in 2023 that was included in deferred revenue as of September 24, 2022.
@@ -175,7 +176,7 @@ Total net sales include $8.2 billion of revenue recognized in 2023 that was incl
         "User question: How much revenue did Apex Devices recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
     )
 
-    assert "Apex Devices recognized $8.2 billion of revenue in 2023" in answer
+    assert "$8.2 billion of revenue recognized in 2023" in answer
 
 
 def test_demo_model_prefers_deferred_revenue_over_distractors():
@@ -192,11 +193,11 @@ Total net sales include $8.2 billion of revenue recognized in 2023 that was incl
         "User question: How much revenue did Apex Devices recognize in 2023 that was included in deferred revenue as of September 24, 2022?"
     )
 
-    assert "Apex Devices recognized $8.2 billion of revenue in 2023" in answer
+    assert "$8.2 billion of revenue recognized in 2023" in answer
 
 
 def test_demo_model_classifies_how_much_as_factoid():
-    assert DemoChatModel._classify_intent("How much revenue did Apple recognize?") == "factoid"
+    assert DemoChatModel._classify_intent("How much revenue did Apex Devices recognize?") == "factoid"
 
 
 @pytest.mark.asyncio
@@ -339,3 +340,4 @@ def test_doc_id_uses_canonical_path(tmp_path, monkeypatch):
     absolute_id = DocParserAgent._make_doc_id(str(report))
 
     assert relative_id == absolute_id
+
