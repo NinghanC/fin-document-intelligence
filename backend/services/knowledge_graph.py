@@ -12,8 +12,10 @@ Responsibilities:
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
+import sqlite3
 import time
 from difflib import SequenceMatcher
 from typing import Any
@@ -53,13 +55,16 @@ logger = structlog.get_logger("finsight.knowledge_graph")
 class KnowledgeGraphService:
     """Neo4j knowledge graph service"""
 
-    def __init__(self, community_summarizer: CommunitySummarizer | None = None) -> None:
+    def __init__(self, community_summarizer: CommunitySummarizer | None = None, persist_fallback: bool = False) -> None:
         self._driver: Any = None
+        self._persist_fallback = persist_fallback
         self._entities: dict[str, dict[str, Any]] = {}
         self._aliases: dict[str, str] = {}
         self._relations: list[dict[str, Any]] = []
         self._community_summaries: dict[str, dict[str, Any]] = {}
         self._community_summarizer = community_summarizer or create_community_summarizer()
+        if self._persist_fallback:
+            self._load_fallback_graph()
 
     # lifecycle
     async def init(self) -> None:
@@ -112,6 +117,7 @@ class KnowledgeGraphService:
         for alias in self._entity_aliases(entity):
             self._aliases[self.normalize_entity_name(alias)] = entity.name
         if not self._driver:
+            self._persist_fallback_entity(self._entities[entity.name])
             return
         """
         Create or update entity nodes using MERGE semantics
@@ -161,6 +167,7 @@ class KnowledgeGraphService:
         if rel_record not in self._relations:
             self._relations.append(rel_record)
         if not self._driver:
+            self._persist_fallback_relation(rel_record)
             return
         # Cypher cannot parameterize relationship type tokens. rel_type is
         # therefore constrained to ALLOWED_RELATION_TYPES before interpolation.
@@ -461,7 +468,7 @@ class KnowledgeGraphService:
         """Get graph statistics"""
         if not self._driver:
             return {
-                "backend": "memory",
+                "backend": "sqlite_fallback" if self._persist_fallback else "memory",
                 "total_entities": len(self._entities),
                 "total_relations": len(self._relations),
             }
@@ -472,6 +479,176 @@ class KnowledgeGraphService:
             "total_relations": rel_count[0]["cnt"] if rel_count else 0,
         }
 
+    def _fallback_path(self) -> str:
+        return os.path.abspath(os.path.join(settings.upload_dir, "..", "knowledge_graph_fallback.sqlite3"))
+
+    def _fallback_connect(self) -> sqlite3.Connection:
+        path = self._fallback_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        conn = sqlite3.connect(path, timeout=30.0, isolation_level=None)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS graph_entities (
+                name TEXT PRIMARY KEY,
+                type TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                confidence REAL NOT NULL DEFAULT 1.0,
+                normalized_name TEXT NOT NULL,
+                aliases TEXT NOT NULL DEFAULT '[]',
+                properties TEXT NOT NULL DEFAULT '{}',
+                version INTEGER NOT NULL DEFAULT 1,
+                source TEXT NOT NULL DEFAULT '',
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS graph_relations (
+                head TEXT NOT NULL,
+                relation TEXT NOT NULL,
+                tail TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 1.0,
+                source TEXT NOT NULL DEFAULT '',
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY (head, relation, tail, source)
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_graph_entities_source ON graph_entities(source)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_graph_relations_source ON graph_relations(source)")
+        return conn
+
+    def _load_fallback_graph(self) -> None:
+        with self._fallback_connect() as conn:
+            entity_rows = conn.execute(
+                """
+                SELECT name, type, description, confidence, normalized_name, aliases,
+                       properties, version, source, updated_at
+                FROM graph_entities
+                """
+            ).fetchall()
+            relation_rows = conn.execute(
+                "SELECT head, relation, tail, confidence, source, updated_at FROM graph_relations"
+            ).fetchall()
+
+        self._entities = {}
+        self._aliases = {}
+        for row in entity_rows:
+            aliases = json.loads(str(row["aliases"] or "[]"))
+            properties = json.loads(str(row["properties"] or "{}"))
+            record = {
+                "name": str(row["name"]),
+                "type": str(row["type"]),
+                "description": str(row["description"]),
+                "confidence": float(row["confidence"]),
+                "normalized_name": str(row["normalized_name"]),
+                "aliases": aliases,
+                "properties": properties,
+                "version": int(row["version"]),
+                "source": str(row["source"]),
+                "updated_at": int(row["updated_at"]),
+            }
+            self._entities[record["name"]] = record
+            for alias in aliases:
+                self._aliases[self.normalize_entity_name(str(alias))] = record["name"]
+
+        self._relations = [
+            {
+                "head": str(row["head"]),
+                "relation": str(row["relation"]),
+                "tail": str(row["tail"]),
+                "confidence": float(row["confidence"]),
+                "source": str(row["source"]),
+                "updated_at": int(row["updated_at"]),
+            }
+            for row in relation_rows
+        ]
+
+    def _persist_fallback_entity(self, record: dict[str, Any]) -> None:
+        if not self._persist_fallback:
+            return
+        with self._fallback_connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO graph_entities(
+                    name, type, description, confidence, normalized_name, aliases,
+                    properties, version, source, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(name) DO UPDATE SET
+                    type = excluded.type,
+                    description = excluded.description,
+                    confidence = excluded.confidence,
+                    normalized_name = excluded.normalized_name,
+                    aliases = excluded.aliases,
+                    properties = excluded.properties,
+                    version = excluded.version,
+                    source = excluded.source,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    record["name"],
+                    record["type"],
+                    record.get("description", ""),
+                    float(record.get("confidence", 1.0)),
+                    record.get("normalized_name", self.normalize_entity_name(str(record["name"]))),
+                    json.dumps(record.get("aliases", []), sort_keys=True),
+                    json.dumps(record.get("properties", {}), sort_keys=True),
+                    int(record.get("version", 1)),
+                    record.get("source", ""),
+                    int(record.get("updated_at", time.time())),
+                ),
+            )
+            conn.commit()
+
+    def _persist_fallback_relation(self, record: dict[str, Any]) -> None:
+        if not self._persist_fallback:
+            return
+        with self._fallback_connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO graph_relations(head, relation, tail, confidence, source, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(head, relation, tail, source) DO UPDATE SET
+                    confidence = excluded.confidence,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    record["head"],
+                    record["relation"],
+                    record["tail"],
+                    float(record.get("confidence", 1.0)),
+                    record.get("source", ""),
+                    int(record.get("updated_at", time.time())),
+                ),
+            )
+            conn.commit()
+
+    def _delete_fallback_by_source(self, source_prefixes: tuple[str, str, str]) -> None:
+        if not self._persist_fallback:
+            return
+        with self._fallback_connect() as conn:
+            entity_names = [
+                str(row["name"])
+                for row in conn.execute("SELECT name, source FROM graph_entities").fetchall()
+                if self._source_matches(str(row["source"]), source_prefixes)
+            ]
+            for name in entity_names:
+                conn.execute("DELETE FROM graph_entities WHERE name = ?", (name,))
+            for row in conn.execute("SELECT head, relation, tail, source FROM graph_relations").fetchall():
+                if (
+                    self._source_matches(str(row["source"]), source_prefixes)
+                    or str(row["head"]) in entity_names
+                    or str(row["tail"]) in entity_names
+                ):
+                    conn.execute(
+                        "DELETE FROM graph_relations WHERE head = ? AND relation = ? AND tail = ? AND source = ?",
+                        (row["head"], row["relation"], row["tail"], row["source"]),
+                    )
+            conn.commit()
     def _memory_neighbors(self, entity_name: str, hops: int = 2) -> list[dict]:
         seen = {entity_name}
         frontier = {entity_name}

@@ -36,7 +36,7 @@ from services.knowledge_graph import KnowledgeGraphService
 from services.vector_store import VectorStoreService
 
 vector_store = VectorStoreService()
-knowledge_graph = KnowledgeGraphService()
+knowledge_graph = KnowledgeGraphService(persist_fallback=True)
 cdc_processor = CDCProcessor()
 workflows: dict[str, Any] = {}
 background_tasks: list[asyncio.Task] = []

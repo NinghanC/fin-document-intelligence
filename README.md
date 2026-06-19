@@ -415,7 +415,7 @@ The prototype keeps these paths explicit instead of asking a model to invent the
 - Rule-based routing is easier to audit than a learned router when the labeled retrieval set is still small.
 - Learned routing or HAN-style metapath attention only makes sense after the graph ontology is stable and a labeled retrieval benchmark exists.
 
-Implementation-wise, `MetapathRouter` is now a compatibility facade over `CandidateMetapathGenerator` and `RuleMetapathRanker`. The generator produces the validated finance metapath candidate set, while the rule ranker scores terms such as `sector`, `geographic`, `supplier`, `technology`, or `compliance` and emits a trace with matched keywords, selection reason, and fallback status. `KnowledgeGraphService.traverse_metapath()` then walks the typed path in Neo4j or the in-memory graph fallback. Metapath contexts include structured path edges, intermediate entities, start/end entities, and router trace metadata so graph evidence can be audited. `LogicalInferenceEngine` applies approved inference rules on top of those typed paths and emits `source_type="inference"` contexts. Matching paths and inferred facts are fused with vector, subgraph, path, and community evidence through RRF. The learned-ranker/HAN insertion point is the ranker interface, not the traversal or QA API.
+Implementation-wise, `MetapathRouter` is now a compatibility facade over `CandidateMetapathGenerator` and `RuleMetapathRanker`. The generator produces the validated finance metapath candidate set, while the rule ranker scores terms such as `sector`, `geographic`, `supplier`, `technology`, or `compliance` and emits a trace with matched keywords, selection reason, and fallback status. `KnowledgeGraphService.traverse_metapath()` then walks the typed path in Neo4j or the local SQLite graph fallback used when Neo4j is unavailable. Metapath contexts include structured path edges, intermediate entities, start/end entities, and router trace metadata so graph evidence can be audited. `LogicalInferenceEngine` applies approved inference rules on top of those typed paths and emits `source_type="inference"` contexts. Matching paths and inferred facts are fused with vector, subgraph, path, and community evidence through RRF. The learned-ranker/HAN insertion point is the ranker interface, not the traversal or QA API.
 
 Example:
 
@@ -547,7 +547,7 @@ These are smoke tests, not a full evaluation set. They are intentionally separat
 
 #### Optional Live Infrastructure Smoke Tests
 
-The default tests also use in-memory graph storage and deterministic embedding fallbacks where appropriate, so they can run without Docker. To verify that the real infrastructure paths work, the repo includes optional `live_infra` tests for:
+The default tests use in-memory graph storage and deterministic embedding fallbacks where appropriate, so they can run without Docker. The API runtime enables a local SQLite graph fallback when Neo4j is unavailable, so fallback graph data survives process restarts during local demos. To verify that the real infrastructure paths work, the repo includes optional `live_infra` tests for:
 
 - Neo4j entity and relationship writes/reads
 - ChromaDB HTTP add/search
@@ -587,7 +587,7 @@ The response includes:
 Operational hardening in the public prototype:
 
 - Batch uploads are processed with bounded concurrency (`BATCH_UPLOAD_CONCURRENCY`) and return per-file success/failure results instead of failing the entire batch on one bad upload.
-- Retrieval, parsing, graph, and storage fallbacks emit structured warning logs instead of silently swallowing exceptions.
+- Retrieval, parsing, graph, and storage fallbacks emit structured warning logs instead of silently swallowing exceptions; the API graph fallback is SQLite-backed rather than process-memory-only.
 - Local embedding worker failures fall back to deterministic hash embeddings with a warning, rather than writing all-zero vectors.
 - Rate-limit buckets and request metrics default to in-memory state for local demos, with PostgreSQL-backed persistence via `API_STATE_BACKEND=postgres` and `API_STATE_DSN`; API state degrades to memory if the persistent store is unavailable.
 - The QA LangGraph includes conditional routing: low-quality answers are retried once with stronger evidence focus, then converted into an insufficient-evidence response instead of pretending to answer.
@@ -608,7 +608,7 @@ changes -> process -> conditional retry -> END
 - file hash comparison
 - batch processing
 - one retry pass through LangGraph
-- failed-ingestion dead-letter visibility in `/api/admin/stats`, plus operator endpoints to list, retry, and clear failed ingestion records
+- SQLite-backed failed-ingestion registry with dead-letter visibility in `/api/admin/stats`, plus operator endpoints to list, retry, and clear failed ingestion records
 
 `CDCProcessor` also provides helpers for:
 
@@ -880,7 +880,7 @@ Known gaps:
 
 - API-key authentication is available for protected deployments, but there is no role-based access control.
 - No tenant isolation.
-- No full background job queue for ingestion; failed ingestions are exposed as operator-manageable dead letters with list, retry, and clear endpoints.
+- No full background job queue for ingestion; failed ingestions are stored in a SQLite-backed registry and exposed as operator-manageable dead letters with list, retry, and clear endpoints.
 - No malware scanning or file sandboxing for uploads.
 - No full observability stack.
 - No formal audit log for regulated workflows.

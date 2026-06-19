@@ -39,6 +39,9 @@ ingestion_registry.json
 .docker_demo_samples/
 .pytest_cache/
 *.sqlite
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
 *.db
 data/
 

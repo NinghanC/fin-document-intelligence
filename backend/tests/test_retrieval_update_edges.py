@@ -13,7 +13,7 @@ from services.cdc_processor import CDCProcessor
 from services.community_summarizer import StructuredCommunitySummarizer
 from services.embedding_worker import _worker_process
 from services.graph_rag import GraphRAGContext, GraphRAGPipeline
-from services.ingestion_registry import ingestion_registry
+from services.ingestion_registry import IngestionRegistry, ingestion_registry
 from services.knowledge_graph import KnowledgeGraphService
 from services.logical_inference import LogicalInferenceEngine
 from services.metapaths import (
@@ -106,6 +106,22 @@ async def test_memory_graph_traverses_finance_metapath_with_direction():
 
 
 @pytest.mark.asyncio
+async def test_persistent_graph_fallback_survives_service_restart(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.knowledge_graph.settings.upload_dir", str(tmp_path))
+    first = KnowledgeGraphService(persist_fallback=True)
+    await first.upsert_entity(Entity("Global Income Fund", "Fund"))
+    await first.upsert_entity(Entity("Microsoft", "Company"))
+    await first.add_relation(Relation("Global Income Fund", "holds", "Microsoft"))
+
+    restarted = KnowledgeGraphService(persist_fallback=True)
+    neighbors = await restarted.get_neighbors("Global Income Fund", hops=1)
+    stats = await restarted.get_stats()
+
+    assert stats["backend"] == "sqlite_fallback"
+    assert stats["total_entities"] == 2
+    assert stats["total_relations"] == 1
+    assert neighbors[0]["target"] == "Microsoft"
+
 async def test_graphrag_metapath_search_adds_explainable_context():
     class VectorStore:
         async def search(self, query, top_k=5):
@@ -1052,6 +1068,25 @@ async def test_ingestion_registry_skips_committed_same_content(tmp_path, monkeyp
     assert skipped_second is True
     assert record.doc_id == "doc-1"
 
+
+
+
+def test_ingestion_registry_sqlite_is_shared_across_instances(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.ingestion_registry.settings.upload_dir", str(tmp_path))
+    first = IngestionRegistry()
+    second = IngestionRegistry()
+    source = tmp_path / "shared.txt"
+    source.write_text("shared registry content", encoding="utf-8")
+
+    skipped_first, _ = first.begin("doc-shared", str(source))
+    first.commit("doc-shared")
+    skipped_second, record = second.begin("doc-shared-copy", str(source))
+
+    assert skipped_first is False
+    assert skipped_second is True
+    assert record.doc_id == "doc-shared"
+    assert second.is_committed("doc-shared") is True
+    assert "doc-shared" in second.committed_doc_ids()
 
 def test_ingestion_registry_dead_letters_failed_records(tmp_path, monkeypatch):
     monkeypatch.setattr("services.ingestion_registry.settings.upload_dir", str(tmp_path))
