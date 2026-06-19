@@ -1,0 +1,154 @@
+[
+  {
+    "id": 0,
+    "name": "sector_exposure",
+    "description": "Find sectors represented by companies held by a fund.",
+    "steps": [
+      {
+        "from_type": "Fund",
+        "relation": "holds",
+        "direction": "out",
+        "to_type": "Company"
+      },
+      {
+        "from_type": "Company",
+        "relation": "belongs_to",
+        "direction": "out",
+        "to_type": "Sector"
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "name": "geographic_risk",
+    "description": "Find geographic regions represented by fund holdings.",
+    "steps": [
+      {
+        "from_type": "Fund",
+        "relation": "holds",
+        "direction": "out",
+        "to_type": "Company"
+      },
+      {
+        "from_type": "Company",
+        "relation": "located_in",
+        "direction": "out",
+        "to_type": "Region"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "supply_chain_risk",
+    "description": "Find supplier dependencies created by fund holdings.",
+    "steps": [
+      {
+        "from_type": "Fund",
+        "relation": "holds",
+        "direction": "out",
+        "to_type": "Company"
+      },
+      {
+        "from_type": "Company",
+        "relation": "depends_on",
+        "direction": "out",
+        "to_type": "Supplier"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "technology_risk",
+    "description": "Find technology dependencies created by fund holdings.",
+    "steps": [
+      {
+        "from_type": "Fund",
+        "relation": "holds",
+        "direction": "out",
+        "to_type": "Company"
+      },
+      {
+        "from_type": "Company",
+        "relation": "uses",
+        "direction": "out",
+        "to_type": "Technology"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "shared_sector",
+    "description": "Find companies connected through the same sector.",
+    "steps": [
+      {
+        "from_type": "Company",
+        "relation": "belongs_to",
+        "direction": "out",
+        "to_type": "Sector"
+      },
+      {
+        "from_type": "Sector",
+        "relation": "belongs_to",
+        "direction": "in",
+        "to_type": "Company"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "name": "management_overlap",
+    "description": "Find companies connected through shared people.",
+    "steps": [
+      {
+        "from_type": "Company",
+        "relation": "works_at",
+        "direction": "in",
+        "to_type": "Person"
+      },
+      {
+        "from_type": "Person",
+        "relation": "works_at",
+        "direction": "out",
+        "to_type": "Company"
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "name": "compliance_chain",
+    "description": "Find regulations that apply through fund holdings.",
+    "steps": [
+      {
+        "from_type": "Fund",
+        "relation": "holds",
+        "direction": "out",
+        "to_type": "Company"
+      },
+      {
+        "from_type": "Company",
+        "relation": "subject_to",
+        "direction": "out",
+        "to_type": "Regulation"
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "name": "subsidiary_chain",
+    "description": "Find multi-level company ownership chains.",
+    "steps": [
+      {
+        "from_type": "Company",
+        "relation": "owns",
+        "direction": "out",
+        "to_type": "Company"
+      },
+      {
+        "from_type": "Company",
+        "relation": "owns",
+        "direction": "out",
+        "to_type": "Company"
+      }
+    ]
+  }
+]

@@ -1,0 +1,247 @@
+[
+  {
+    "id": 0,
+    "name": "ASML",
+    "type": "Company"
+  },
+  {
+    "id": 1,
+    "name": "Alphabet",
+    "type": "Company"
+  },
+  {
+    "id": 2,
+    "name": "Amazon",
+    "type": "Company"
+  },
+  {
+    "id": 3,
+    "name": "American Express",
+    "type": "Company"
+  },
+  {
+    "id": 4,
+    "name": "Apple Inc.",
+    "type": "Company"
+  },
+  {
+    "id": 5,
+    "name": "Azure",
+    "type": "Technology"
+  },
+  {
+    "id": 6,
+    "name": "Bank of America",
+    "type": "Company"
+  },
+  {
+    "id": 7,
+    "name": "Basel III",
+    "type": "Regulation"
+  },
+  {
+    "id": 8,
+    "name": "Berkshire Hathaway",
+    "type": "Company"
+  },
+  {
+    "id": 9,
+    "name": "Berkshire Hathaway 13F Portfolio",
+    "type": "Fund"
+  },
+  {
+    "id": 10,
+    "name": "BlackRock 13F Portfolio",
+    "type": "Fund"
+  },
+  {
+    "id": 11,
+    "name": "Broadcom",
+    "type": "Company"
+  },
+  {
+    "id": 12,
+    "name": "Chevron",
+    "type": "Company"
+  },
+  {
+    "id": 13,
+    "name": "CloudOps Europe",
+    "type": "Supplier"
+  },
+  {
+    "id": 14,
+    "name": "Coca-Cola",
+    "type": "Company"
+  },
+  {
+    "id": 15,
+    "name": "Communication Services",
+    "type": "Sector"
+  },
+  {
+    "id": 16,
+    "name": "Consumer Discretionary",
+    "type": "Sector"
+  },
+  {
+    "id": 17,
+    "name": "Consumer Staples",
+    "type": "Sector"
+  },
+  {
+    "id": 18,
+    "name": "Core Banking Platform",
+    "type": "Technology"
+  },
+  {
+    "id": 19,
+    "name": "David Morgan",
+    "type": "Person"
+  },
+  {
+    "id": 20,
+    "name": "Defensive Credit Fund",
+    "type": "Fund"
+  },
+  {
+    "id": 21,
+    "name": "Eli Lilly",
+    "type": "Company"
+  },
+  {
+    "id": 22,
+    "name": "Energy",
+    "type": "Sector"
+  },
+  {
+    "id": 23,
+    "name": "Europe",
+    "type": "Region"
+  },
+  {
+    "id": 24,
+    "name": "Financials",
+    "type": "Sector"
+  },
+  {
+    "id": 25,
+    "name": "First Data Services",
+    "type": "Company"
+  },
+  {
+    "id": 26,
+    "name": "GPU Acceleration",
+    "type": "Technology"
+  },
+  {
+    "id": 27,
+    "name": "Global Income Fund",
+    "type": "Fund"
+  },
+  {
+    "id": 28,
+    "name": "Health Care",
+    "type": "Sector"
+  },
+  {
+    "id": 29,
+    "name": "JPMorgan Chase",
+    "type": "Company"
+  },
+  {
+    "id": 30,
+    "name": "Kraft Heinz",
+    "type": "Company"
+  },
+  {
+    "id": 31,
+    "name": "Liquidity Risk",
+    "type": "RiskFactor"
+  },
+  {
+    "id": 32,
+    "name": "Maria Chen",
+    "type": "Person"
+  },
+  {
+    "id": 33,
+    "name": "Merchant Services Europe",
+    "type": "Company"
+  },
+  {
+    "id": 34,
+    "name": "Meta Platforms",
+    "type": "Company"
+  },
+  {
+    "id": 35,
+    "name": "Microsoft",
+    "type": "Company"
+  },
+  {
+    "id": 36,
+    "name": "Moody's",
+    "type": "Company"
+  },
+  {
+    "id": 37,
+    "name": "Netherlands",
+    "type": "Region"
+  },
+  {
+    "id": 38,
+    "name": "Nvidia",
+    "type": "Company"
+  },
+  {
+    "id": 39,
+    "name": "Occidental Petroleum",
+    "type": "Company"
+  },
+  {
+    "id": 40,
+    "name": "SEC Liquidity Rule",
+    "type": "Regulation"
+  },
+  {
+    "id": 41,
+    "name": "Semiconductors",
+    "type": "Sector"
+  },
+  {
+    "id": 42,
+    "name": "Strategic Growth Fund",
+    "type": "Fund"
+  },
+  {
+    "id": 43,
+    "name": "Supply Chain Risk",
+    "type": "RiskFactor"
+  },
+  {
+    "id": 44,
+    "name": "Taiwan Semiconductor Manufacturing",
+    "type": "Supplier"
+  },
+  {
+    "id": 45,
+    "name": "Technology",
+    "type": "Sector"
+  },
+  {
+    "id": 46,
+    "name": "United States",
+    "type": "Region"
+  },
+  {
+    "id": 47,
+    "name": "Vanguard 13F Portfolio",
+    "type": "Fund"
+  },
+  {
+    "id": 48,
+    "name": "Visa",
+    "type": "Company"
+  }
+]

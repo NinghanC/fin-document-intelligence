@@ -10,18 +10,22 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
-from dotenv import dotenv_values
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from bootstrap_helpers import load_env_file  # noqa: E402
 
 PLACEHOLDER_MODEL_IDS = {"", "gpt-4o", "your-model", "your-bedrock-model-id"}
 
 
 def _load_env(env_file: Path) -> dict[str, str]:
-    values = {key: str(value) for key, value in dotenv_values(env_file).items() if value is not None}
-    merged = {**values, **os.environ}
-    return {key: str(value) for key, value in merged.items()}
+    load_env_file(env_file)
+    return {key: str(value) for key, value in os.environ.items()}
 
 
 def evaluate_config(

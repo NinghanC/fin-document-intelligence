@@ -1,0 +1,322 @@
+[
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 5,
+    "node_ids": [
+      10,
+      35,
+      5
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Microsoft",
+      "Azure"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 35,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 5,
+        "source": "Microsoft",
+        "target": "Azure",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 26,
+    "node_ids": [
+      10,
+      38,
+      26
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Nvidia",
+      "GPU Acceleration"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 38,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 26,
+        "source": "Nvidia",
+        "target": "GPU Acceleration",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 18,
+    "node_ids": [
+      10,
+      29,
+      18
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "JPMorgan Chase",
+      "Core Banking Platform"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 29,
+        "source": "BlackRock 13F Portfolio",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 18,
+        "source": "JPMorgan Chase",
+        "target": "Core Banking Platform",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  },
+  {
+    "start_entity_id": 20,
+    "end_entity_id": 18,
+    "node_ids": [
+      20,
+      29,
+      18
+    ],
+    "nodes": [
+      "Defensive Credit Fund",
+      "JPMorgan Chase",
+      "Core Banking Platform"
+    ],
+    "edges": [
+      {
+        "source_id": 20,
+        "target_id": 29,
+        "source": "Defensive Credit Fund",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 18,
+        "source": "JPMorgan Chase",
+        "target": "Core Banking Platform",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 5,
+    "node_ids": [
+      27,
+      35,
+      5
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "Microsoft",
+      "Azure"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 35,
+        "source": "Global Income Fund",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 5,
+        "source": "Microsoft",
+        "target": "Azure",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 18,
+    "node_ids": [
+      27,
+      29,
+      18
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "JPMorgan Chase",
+      "Core Banking Platform"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 29,
+        "source": "Global Income Fund",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 18,
+        "source": "JPMorgan Chase",
+        "target": "Core Banking Platform",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  },
+  {
+    "start_entity_id": 42,
+    "end_entity_id": 26,
+    "node_ids": [
+      42,
+      38,
+      26
+    ],
+    "nodes": [
+      "Strategic Growth Fund",
+      "Nvidia",
+      "GPU Acceleration"
+    ],
+    "edges": [
+      {
+        "source_id": 42,
+        "target_id": 38,
+        "source": "Strategic Growth Fund",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 26,
+        "source": "Nvidia",
+        "target": "GPU Acceleration",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 5,
+    "node_ids": [
+      47,
+      35,
+      5
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Microsoft",
+      "Azure"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 35,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 5,
+        "source": "Microsoft",
+        "target": "Azure",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 26,
+    "node_ids": [
+      47,
+      38,
+      26
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Nvidia",
+      "GPU Acceleration"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 38,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 26,
+        "source": "Nvidia",
+        "target": "GPU Acceleration",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 18,
+    "node_ids": [
+      47,
+      29,
+      18
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "JPMorgan Chase",
+      "Core Banking Platform"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 29,
+        "source": "Vanguard 13F Portfolio",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 18,
+        "source": "JPMorgan Chase",
+        "target": "Core Banking Platform",
+        "relation": "uses",
+        "relation_type_id": 7
+      }
+    ]
+  }
+]

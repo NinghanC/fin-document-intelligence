@@ -1,0 +1,38 @@
+[
+  {
+    "id": 0,
+    "name": "belongs_to"
+  },
+  {
+    "id": 1,
+    "name": "depends_on"
+  },
+  {
+    "id": 2,
+    "name": "holds"
+  },
+  {
+    "id": 3,
+    "name": "located_in"
+  },
+  {
+    "id": 4,
+    "name": "owns"
+  },
+  {
+    "id": 5,
+    "name": "related_to"
+  },
+  {
+    "id": 6,
+    "name": "subject_to"
+  },
+  {
+    "id": 7,
+    "name": "uses"
+  },
+  {
+    "id": 8,
+    "name": "works_at"
+  }
+]

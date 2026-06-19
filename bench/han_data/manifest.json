@@ -1,0 +1,8 @@
+{
+  "format": "han_ready_metapath_graph_v1",
+  "entity_count": 49,
+  "relation_count": 97,
+  "relation_type_count": 9,
+  "metapath_count": 8,
+  "query_count": 24
+}

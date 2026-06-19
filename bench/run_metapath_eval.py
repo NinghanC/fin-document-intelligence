@@ -70,6 +70,9 @@ async def _evaluate(dataset: dict[str, Any]) -> dict[str, Any]:
         selected_names = [selection.spec.name for selection in selections]
         expected_metapath = item["expected_metapath"]
         router_hit = expected_metapath in selected_names
+        router_top1_hit = bool(selected_names) and selected_names[0] == expected_metapath
+        router_precision = (1.0 / len(selected_names)) if router_hit and selected_names else 0.0
+        extra_metapaths = [name for name in selected_names if name != expected_metapath]
 
         oracle_paths = await graph.traverse_metapath(item["start_entities"], FINANCIAL_METAPATHS[expected_metapath])
         oracle_reached = sorted({result.end_entity for result in oracle_paths})
@@ -84,6 +87,9 @@ async def _evaluate(dataset: dict[str, Any]) -> dict[str, Any]:
             "selected_metapaths": selected_names,
             "router_trace": [selection.as_trace() for selection in selections],
             "router_hit": router_hit,
+            "router_top1_hit": router_top1_hit,
+            "router_precision": round(router_precision, 3),
+            "extra_metapaths": extra_metapaths,
             "expected_end_entities": sorted(expected_end_entities),
             "routed_reached_end_entities": routed_reached,
             "oracle_reached_end_entities": oracle_reached,
@@ -96,6 +102,9 @@ async def _evaluate(dataset: dict[str, Any]) -> dict[str, Any]:
 
     total = len(rows)
     router_hits = sum(1 for row in rows if row["router_hit"])
+    router_top1_hits = sum(1 for row in rows if row["router_top1_hit"])
+    average_router_precision = sum(float(row["router_precision"]) for row in rows) / max(total, 1)
+    average_selected_metapaths = sum(len(row["selected_metapaths"]) for row in rows) / max(total, 1)
     routed_path_hits = sum(1 for row in rows if row["routed_path_hit"])
     oracle_path_hits = sum(1 for row in rows if row["oracle_path_hit"])
     average_routed_recall = sum(float(row["routed_path_recall"]) for row in rows) / max(total, 1)
@@ -105,6 +114,9 @@ async def _evaluate(dataset: dict[str, Any]) -> dict[str, Any]:
         "total": total,
         "router_hits": router_hits,
         "router_hit_rate": round(router_hits / max(total, 1), 3),
+        "router_top1_hit_rate": round(router_top1_hits / max(total, 1), 3),
+        "average_router_precision": round(average_router_precision, 3),
+        "average_selected_metapaths": round(average_selected_metapaths, 3),
         "routed_path_hits": routed_path_hits,
         "routed_path_hit_rate": round(routed_path_hits / max(total, 1), 3),
         "average_routed_path_recall": round(average_routed_recall, 3),

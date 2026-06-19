@@ -415,7 +415,7 @@ The prototype keeps these paths explicit instead of asking a model to invent the
 - Rule-based routing is easier to audit than a learned router when the labeled retrieval set is still small.
 - Learned routing or HAN-style metapath attention only makes sense after the graph ontology is stable and a labeled retrieval benchmark exists.
 
-Implementation-wise, `MetapathRouter` selects candidate paths from query terms such as `sector`, `geographic`, `supplier`, `technology`, or `compliance`, and emits a trace with matched keywords, selection reason, and fallback status. `KnowledgeGraphService.traverse_metapath()` then walks the typed path in Neo4j or the in-memory graph fallback. Metapath contexts include structured path edges, intermediate entities, start/end entities, and router trace metadata so graph evidence can be audited. `LogicalInferenceEngine` applies approved inference rules on top of those typed paths and emits `source_type="inference"` contexts. Matching paths and inferred facts are fused with vector, subgraph, path, and community evidence through RRF.
+Implementation-wise, `MetapathRouter` is now a compatibility facade over `CandidateMetapathGenerator` and `RuleMetapathRanker`. The generator produces the validated finance metapath candidate set, while the rule ranker scores terms such as `sector`, `geographic`, `supplier`, `technology`, or `compliance` and emits a trace with matched keywords, selection reason, and fallback status. `KnowledgeGraphService.traverse_metapath()` then walks the typed path in Neo4j or the in-memory graph fallback. Metapath contexts include structured path edges, intermediate entities, start/end entities, and router trace metadata so graph evidence can be audited. `LogicalInferenceEngine` applies approved inference rules on top of those typed paths and emits `source_type="inference"` contexts. Matching paths and inferred facts are fused with vector, subgraph, path, and community evidence through RRF. The learned-ranker/HAN insertion point is the ranker interface, not the traversal or QA API.
 
 Example:
 
@@ -471,11 +471,21 @@ Company -> belongs_to -> Sector <- belongs_to <- Company
 
 `run_metapath_eval.py` and `run_real_holdings_eval.py` build in-memory graphs, run `MetapathRouter`, and report routed and oracle path metrics separately:
 
-- router hit rate: whether the rule router selected the expected metapath
+- router hit rate: whether the rule router selected the expected metapath anywhere in its candidate set
+- router top-1 hit rate: whether the expected metapath was the first selected path
+- average router precision and average selected metapaths: how much routing noise exists before traversal
 - routed path hit rate / routed end-entity recall: whether the selected metapaths reach the expected entities
 - oracle path hit rate / oracle end-entity recall: whether the graph can reach expected entities when the labeled metapath is supplied
 
 This split avoids circular scoring. Oracle traversal validates graph data and typed traversal; routed traversal validates the end-to-end metapath retrieval path that a user query actually exercises.
+
+`export_metapath_training_data.py` prepares the pre-HAN training format. It exports pairwise query-metapath examples to `bench/han_data/metapath_training.jsonl`: each labeled question is expanded across every configured candidate metapath, with `label=1` for the benchmark path and `label=0` for the other candidates. Each row includes the query, linked start entities, candidate path steps, router-selected status, router rank, router score, matched keywords, selection reason, and a `features` object with query token counts, path length, keyword coverage, start-entity type compatibility, and router-derived numeric features. The current export contains 24 labeled questions, 8 candidate metapaths, and 192 pairwise records. This is the data bridge for a learned metapath ranker or HAN-style attention layer; the current runtime remains rule-routed until that model is trained and evaluated.
+
+`train_metapath_ranker.py` trains a dependency-free pairwise linear ranker on the exported features. The default split trains on `synthetic_finance_graph` and evaluates on `real_13f_style_holdings`, reporting learned top-1 hit rate and MRR against the rule router baseline. On the current small benchmark, the learned baseline reports `learned_top1_hit_rate=1.0` versus `rule_top1_hit_rate=0.625`, and `learned_mrr=1.0` versus `rule_mrr=0.812`. These numbers are a pre-HAN baseline, not a production claim; the dataset is intentionally small and should be expanded before adding neural attention.
+
+`export_han_data.py` writes HAN-ready graph artifacts under `bench/han_data/`: stable `entities.json`, `relations.json`, `relation_types.json`, `metapaths.json`, `query_metapath_labels.jsonl`, and `adjacency_by_metapath/*.json`. The current export contains 49 entities, 97 relation rows, 9 relation types, 8 metapaths, and 24 labeled queries. This is a data-preparation boundary only; the runtime still uses the transparent rule ranker until a neural model is trained, validated, and wired in.
+
+`han_readiness_report.py` is the decision gate before implementing HAN. It checks the training JSONL, HAN artifacts, metapath label coverage, train/eval split size, and whether the lightweight learned ranker is at least as good as the rule router. With the current conservative defaults (`min_queries=50`, `min_eval_queries=10`), the report returns `ready_for_han=false` because the dataset only has 24 labeled queries and 8 held-out real-holdings questions. This is intentional: the repo has the pre-HAN data path, but it does not pretend the labeled set is large enough for a neural attention model yet.
 
 This complements the public-document API benchmark. The public filings test source and evidence retrieval only; the synthetic metapath benchmark tests full graph-pattern coverage; the real-holdings benchmark tests whether those patterns work on a public-finance data shape.
 

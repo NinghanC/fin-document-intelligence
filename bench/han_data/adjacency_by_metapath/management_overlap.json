@@ -1,0 +1,258 @@
+[
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 35,
+    "node_ids": [
+      4,
+      32,
+      35
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Maria Chen",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 32,
+        "source": "Apple Inc.",
+        "target": "Maria Chen",
+        "relation": "works_at",
+        "relation_type_id": 8
+      },
+      {
+        "source_id": 32,
+        "target_id": 35,
+        "source": "Maria Chen",
+        "target": "Microsoft",
+        "relation": "works_at",
+        "relation_type_id": 8
+      }
+    ]
+  },
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 4,
+    "node_ids": [
+      4,
+      32,
+      4
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Maria Chen",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 32,
+        "source": "Apple Inc.",
+        "target": "Maria Chen",
+        "relation": "works_at",
+        "relation_type_id": 8
+      },
+      {
+        "source_id": 32,
+        "target_id": 4,
+        "source": "Maria Chen",
+        "target": "Apple Inc.",
+        "relation": "works_at",
+        "relation_type_id": 8
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 29,
+    "node_ids": [
+      29,
+      19,
+      29
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "David Morgan",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 19,
+        "source": "JPMorgan Chase",
+        "target": "David Morgan",
+        "relation": "works_at",
+        "relation_type_id": 8
+      },
+      {
+        "source_id": 19,
+        "target_id": 29,
+        "source": "David Morgan",
+        "target": "JPMorgan Chase",
+        "relation": "works_at",
+        "relation_type_id": 8
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 48,
+    "node_ids": [
+      29,
+      19,
+      48
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "David Morgan",
+      "Visa"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 19,
+        "source": "JPMorgan Chase",
+        "target": "David Morgan",
+        "relation": "works_at",
+        "relation_type_id": 8
+      },
+      {
+        "source_id": 19,
+        "target_id": 48,
+        "source": "David Morgan",
+        "target": "Visa",
+        "relation": "works_at",
+        "relation_type_id": 8
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 35,
+    "node_ids": [
+      35,
+      32,
+      35
+    ],
+    "nodes": [
+      "Microsoft",
+      "Maria Chen",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 32,
+        "source": "Microsoft",
+        "target": "Maria Chen",
+        "relation": "works_at",
+        "relation_type_id": 8
+      },
+      {
+        "source_id": 32,
+        "target_id": 35,
+        "source": "Maria Chen",
+        "target": "Microsoft",
+        "relation": "works_at",
+        "relation_type_id": 8
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 4,
+    "node_ids": [
+      35,
+      32,
+      4
+    ],
+    "nodes": [
+      "Microsoft",
+      "Maria Chen",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 32,
+        "source": "Microsoft",
+        "target": "Maria Chen",
+        "relation": "works_at",
+        "relation_type_id": 8
+      },
+      {
+        "source_id": 32,
+        "target_id": 4,
+        "source": "Maria Chen",
+        "target": "Apple Inc.",
+        "relation": "works_at",
+        "relation_type_id": 8
+      }
+    ]
+  },
+  {
+    "start_entity_id": 48,
+    "end_entity_id": 29,
+    "node_ids": [
+      48,
+      19,
+      29
+    ],
+    "nodes": [
+      "Visa",
+      "David Morgan",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 48,
+        "target_id": 19,
+        "source": "Visa",
+        "target": "David Morgan",
+        "relation": "works_at",
+        "relation_type_id": 8
+      },
+      {
+        "source_id": 19,
+        "target_id": 29,
+        "source": "David Morgan",
+        "target": "JPMorgan Chase",
+        "relation": "works_at",
+        "relation_type_id": 8
+      }
+    ]
+  },
+  {
+    "start_entity_id": 48,
+    "end_entity_id": 48,
+    "node_ids": [
+      48,
+      19,
+      48
+    ],
+    "nodes": [
+      "Visa",
+      "David Morgan",
+      "Visa"
+    ],
+    "edges": [
+      {
+        "source_id": 48,
+        "target_id": 19,
+        "source": "Visa",
+        "target": "David Morgan",
+        "relation": "works_at",
+        "relation_type_id": 8
+      },
+      {
+        "source_id": 19,
+        "target_id": 48,
+        "source": "David Morgan",
+        "target": "Visa",
+        "relation": "works_at",
+        "relation_type_id": 8
+      }
+    ]
+  }
+]

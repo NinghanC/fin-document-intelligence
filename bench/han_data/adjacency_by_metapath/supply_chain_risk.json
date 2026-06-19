@@ -1,0 +1,354 @@
+[
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 44,
+    "node_ids": [
+      9,
+      4,
+      44
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "Apple Inc.",
+      "Taiwan Semiconductor Manufacturing"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 4,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 44,
+        "source": "Apple Inc.",
+        "target": "Taiwan Semiconductor Manufacturing",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 44,
+    "node_ids": [
+      10,
+      4,
+      44
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Apple Inc.",
+      "Taiwan Semiconductor Manufacturing"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 4,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 44,
+        "source": "Apple Inc.",
+        "target": "Taiwan Semiconductor Manufacturing",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 13,
+    "node_ids": [
+      10,
+      35,
+      13
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Microsoft",
+      "CloudOps Europe"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 35,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 13,
+        "source": "Microsoft",
+        "target": "CloudOps Europe",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 44,
+    "node_ids": [
+      10,
+      38,
+      44
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Nvidia",
+      "Taiwan Semiconductor Manufacturing"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 38,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 44,
+        "source": "Nvidia",
+        "target": "Taiwan Semiconductor Manufacturing",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 13,
+    "node_ids": [
+      27,
+      35,
+      13
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "Microsoft",
+      "CloudOps Europe"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 35,
+        "source": "Global Income Fund",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 13,
+        "source": "Microsoft",
+        "target": "CloudOps Europe",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 42,
+    "end_entity_id": 44,
+    "node_ids": [
+      42,
+      4,
+      44
+    ],
+    "nodes": [
+      "Strategic Growth Fund",
+      "Apple Inc.",
+      "Taiwan Semiconductor Manufacturing"
+    ],
+    "edges": [
+      {
+        "source_id": 42,
+        "target_id": 4,
+        "source": "Strategic Growth Fund",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 44,
+        "source": "Apple Inc.",
+        "target": "Taiwan Semiconductor Manufacturing",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 42,
+    "end_entity_id": 44,
+    "node_ids": [
+      42,
+      38,
+      44
+    ],
+    "nodes": [
+      "Strategic Growth Fund",
+      "Nvidia",
+      "Taiwan Semiconductor Manufacturing"
+    ],
+    "edges": [
+      {
+        "source_id": 42,
+        "target_id": 38,
+        "source": "Strategic Growth Fund",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 44,
+        "source": "Nvidia",
+        "target": "Taiwan Semiconductor Manufacturing",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 42,
+    "end_entity_id": 13,
+    "node_ids": [
+      42,
+      0,
+      13
+    ],
+    "nodes": [
+      "Strategic Growth Fund",
+      "ASML",
+      "CloudOps Europe"
+    ],
+    "edges": [
+      {
+        "source_id": 42,
+        "target_id": 0,
+        "source": "Strategic Growth Fund",
+        "target": "ASML",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 0,
+        "target_id": 13,
+        "source": "ASML",
+        "target": "CloudOps Europe",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 44,
+    "node_ids": [
+      47,
+      4,
+      44
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Apple Inc.",
+      "Taiwan Semiconductor Manufacturing"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 4,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 44,
+        "source": "Apple Inc.",
+        "target": "Taiwan Semiconductor Manufacturing",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 13,
+    "node_ids": [
+      47,
+      35,
+      13
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Microsoft",
+      "CloudOps Europe"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 35,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 13,
+        "source": "Microsoft",
+        "target": "CloudOps Europe",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 44,
+    "node_ids": [
+      47,
+      38,
+      44
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Nvidia",
+      "Taiwan Semiconductor Manufacturing"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 38,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 44,
+        "source": "Nvidia",
+        "target": "Taiwan Semiconductor Manufacturing",
+        "relation": "depends_on",
+        "relation_type_id": 1
+      }
+    ]
+  }
+]

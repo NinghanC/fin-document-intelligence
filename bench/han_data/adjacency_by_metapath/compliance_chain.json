@@ -1,0 +1,194 @@
+[
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 7,
+    "node_ids": [
+      10,
+      29,
+      7
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "JPMorgan Chase",
+      "Basel III"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 29,
+        "source": "BlackRock 13F Portfolio",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 7,
+        "source": "JPMorgan Chase",
+        "target": "Basel III",
+        "relation": "subject_to",
+        "relation_type_id": 6
+      }
+    ]
+  },
+  {
+    "start_entity_id": 20,
+    "end_entity_id": 7,
+    "node_ids": [
+      20,
+      29,
+      7
+    ],
+    "nodes": [
+      "Defensive Credit Fund",
+      "JPMorgan Chase",
+      "Basel III"
+    ],
+    "edges": [
+      {
+        "source_id": 20,
+        "target_id": 29,
+        "source": "Defensive Credit Fund",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 7,
+        "source": "JPMorgan Chase",
+        "target": "Basel III",
+        "relation": "subject_to",
+        "relation_type_id": 6
+      }
+    ]
+  },
+  {
+    "start_entity_id": 20,
+    "end_entity_id": 40,
+    "node_ids": [
+      20,
+      48,
+      40
+    ],
+    "nodes": [
+      "Defensive Credit Fund",
+      "Visa",
+      "SEC Liquidity Rule"
+    ],
+    "edges": [
+      {
+        "source_id": 20,
+        "target_id": 48,
+        "source": "Defensive Credit Fund",
+        "target": "Visa",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 48,
+        "target_id": 40,
+        "source": "Visa",
+        "target": "SEC Liquidity Rule",
+        "relation": "subject_to",
+        "relation_type_id": 6
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 7,
+    "node_ids": [
+      27,
+      29,
+      7
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "JPMorgan Chase",
+      "Basel III"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 29,
+        "source": "Global Income Fund",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 7,
+        "source": "JPMorgan Chase",
+        "target": "Basel III",
+        "relation": "subject_to",
+        "relation_type_id": 6
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 40,
+    "node_ids": [
+      27,
+      48,
+      40
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "Visa",
+      "SEC Liquidity Rule"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 48,
+        "source": "Global Income Fund",
+        "target": "Visa",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 48,
+        "target_id": 40,
+        "source": "Visa",
+        "target": "SEC Liquidity Rule",
+        "relation": "subject_to",
+        "relation_type_id": 6
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 7,
+    "node_ids": [
+      47,
+      29,
+      7
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "JPMorgan Chase",
+      "Basel III"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 29,
+        "source": "Vanguard 13F Portfolio",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 7,
+        "source": "JPMorgan Chase",
+        "target": "Basel III",
+        "relation": "subject_to",
+        "relation_type_id": 6
+      }
+    ]
+  }
+]

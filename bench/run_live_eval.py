@@ -16,6 +16,12 @@ from typing import Any
 
 import httpx
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from bootstrap_helpers import load_env_file  # noqa: E402
+
 INSUFFICIENT_TERMS = (
     "insufficient",
     "not enough",
@@ -128,15 +134,9 @@ def evaluate(
 
 
 def _load_env_file(path: str) -> None:
-    env_path = Path(path)
-    if not path or not env_path.exists():
+    if not path:
         return
-    for line in env_path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+    load_env_file(Path(path))
 
 
 def _provider_configured() -> bool:

@@ -1,0 +1,3042 @@
+[
+  {
+    "start_entity_id": 0,
+    "end_entity_id": 38,
+    "node_ids": [
+      0,
+      41,
+      38
+    ],
+    "nodes": [
+      "ASML",
+      "Semiconductors",
+      "Nvidia"
+    ],
+    "edges": [
+      {
+        "source_id": 0,
+        "target_id": 41,
+        "source": "ASML",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 38,
+        "source": "Semiconductors",
+        "target": "Nvidia",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 0,
+    "end_entity_id": 0,
+    "node_ids": [
+      0,
+      41,
+      0
+    ],
+    "nodes": [
+      "ASML",
+      "Semiconductors",
+      "ASML"
+    ],
+    "edges": [
+      {
+        "source_id": 0,
+        "target_id": 41,
+        "source": "ASML",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 0,
+        "source": "Semiconductors",
+        "target": "ASML",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 0,
+    "end_entity_id": 38,
+    "node_ids": [
+      0,
+      41,
+      38
+    ],
+    "nodes": [
+      "ASML",
+      "Semiconductors",
+      "Nvidia"
+    ],
+    "edges": [
+      {
+        "source_id": 0,
+        "target_id": 41,
+        "source": "ASML",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 38,
+        "source": "Semiconductors",
+        "target": "Nvidia",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 0,
+    "end_entity_id": 11,
+    "node_ids": [
+      0,
+      41,
+      11
+    ],
+    "nodes": [
+      "ASML",
+      "Semiconductors",
+      "Broadcom"
+    ],
+    "edges": [
+      {
+        "source_id": 0,
+        "target_id": 41,
+        "source": "ASML",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 11,
+        "source": "Semiconductors",
+        "target": "Broadcom",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 1,
+    "end_entity_id": 34,
+    "node_ids": [
+      1,
+      15,
+      34
+    ],
+    "nodes": [
+      "Alphabet",
+      "Communication Services",
+      "Meta Platforms"
+    ],
+    "edges": [
+      {
+        "source_id": 1,
+        "target_id": 15,
+        "source": "Alphabet",
+        "target": "Communication Services",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 15,
+        "target_id": 34,
+        "source": "Communication Services",
+        "target": "Meta Platforms",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 1,
+    "end_entity_id": 1,
+    "node_ids": [
+      1,
+      15,
+      1
+    ],
+    "nodes": [
+      "Alphabet",
+      "Communication Services",
+      "Alphabet"
+    ],
+    "edges": [
+      {
+        "source_id": 1,
+        "target_id": 15,
+        "source": "Alphabet",
+        "target": "Communication Services",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 15,
+        "target_id": 1,
+        "source": "Communication Services",
+        "target": "Alphabet",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 2,
+    "end_entity_id": 2,
+    "node_ids": [
+      2,
+      16,
+      2
+    ],
+    "nodes": [
+      "Amazon",
+      "Consumer Discretionary",
+      "Amazon"
+    ],
+    "edges": [
+      {
+        "source_id": 2,
+        "target_id": 16,
+        "source": "Amazon",
+        "target": "Consumer Discretionary",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 16,
+        "target_id": 2,
+        "source": "Consumer Discretionary",
+        "target": "Amazon",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 3,
+    "end_entity_id": 29,
+    "node_ids": [
+      3,
+      24,
+      29
+    ],
+    "nodes": [
+      "American Express",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 3,
+        "target_id": 24,
+        "source": "American Express",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 3,
+    "end_entity_id": 48,
+    "node_ids": [
+      3,
+      24,
+      48
+    ],
+    "nodes": [
+      "American Express",
+      "Financials",
+      "Visa"
+    ],
+    "edges": [
+      {
+        "source_id": 3,
+        "target_id": 24,
+        "source": "American Express",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 48,
+        "source": "Financials",
+        "target": "Visa",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 3,
+    "end_entity_id": 6,
+    "node_ids": [
+      3,
+      24,
+      6
+    ],
+    "nodes": [
+      "American Express",
+      "Financials",
+      "Bank of America"
+    ],
+    "edges": [
+      {
+        "source_id": 3,
+        "target_id": 24,
+        "source": "American Express",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 6,
+        "source": "Financials",
+        "target": "Bank of America",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 3,
+    "end_entity_id": 3,
+    "node_ids": [
+      3,
+      24,
+      3
+    ],
+    "nodes": [
+      "American Express",
+      "Financials",
+      "American Express"
+    ],
+    "edges": [
+      {
+        "source_id": 3,
+        "target_id": 24,
+        "source": "American Express",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 3,
+        "source": "Financials",
+        "target": "American Express",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 3,
+    "end_entity_id": 36,
+    "node_ids": [
+      3,
+      24,
+      36
+    ],
+    "nodes": [
+      "American Express",
+      "Financials",
+      "Moody's"
+    ],
+    "edges": [
+      {
+        "source_id": 3,
+        "target_id": 24,
+        "source": "American Express",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 36,
+        "source": "Financials",
+        "target": "Moody's",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 3,
+    "end_entity_id": 8,
+    "node_ids": [
+      3,
+      24,
+      8
+    ],
+    "nodes": [
+      "American Express",
+      "Financials",
+      "Berkshire Hathaway"
+    ],
+    "edges": [
+      {
+        "source_id": 3,
+        "target_id": 24,
+        "source": "American Express",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 8,
+        "source": "Financials",
+        "target": "Berkshire Hathaway",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 3,
+    "end_entity_id": 29,
+    "node_ids": [
+      3,
+      24,
+      29
+    ],
+    "nodes": [
+      "American Express",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 3,
+        "target_id": 24,
+        "source": "American Express",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 35,
+    "node_ids": [
+      4,
+      45,
+      35
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Technology",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 45,
+        "source": "Apple Inc.",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 35,
+        "source": "Technology",
+        "target": "Microsoft",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 4,
+    "node_ids": [
+      4,
+      45,
+      4
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Technology",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 45,
+        "source": "Apple Inc.",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 4,
+        "source": "Technology",
+        "target": "Apple Inc.",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 4,
+    "node_ids": [
+      4,
+      45,
+      4
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Technology",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 45,
+        "source": "Apple Inc.",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 4,
+        "source": "Technology",
+        "target": "Apple Inc.",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 35,
+    "node_ids": [
+      4,
+      45,
+      35
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Technology",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 45,
+        "source": "Apple Inc.",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 35,
+        "source": "Technology",
+        "target": "Microsoft",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 35,
+    "node_ids": [
+      4,
+      45,
+      35
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Technology",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 45,
+        "source": "Apple Inc.",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 35,
+        "source": "Technology",
+        "target": "Microsoft",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 4,
+    "node_ids": [
+      4,
+      45,
+      4
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Technology",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 45,
+        "source": "Apple Inc.",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 4,
+        "source": "Technology",
+        "target": "Apple Inc.",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 4,
+    "node_ids": [
+      4,
+      45,
+      4
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Technology",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 45,
+        "source": "Apple Inc.",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 4,
+        "source": "Technology",
+        "target": "Apple Inc.",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 4,
+    "end_entity_id": 35,
+    "node_ids": [
+      4,
+      45,
+      35
+    ],
+    "nodes": [
+      "Apple Inc.",
+      "Technology",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 4,
+        "target_id": 45,
+        "source": "Apple Inc.",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 35,
+        "source": "Technology",
+        "target": "Microsoft",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 6,
+    "end_entity_id": 29,
+    "node_ids": [
+      6,
+      24,
+      29
+    ],
+    "nodes": [
+      "Bank of America",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 6,
+        "target_id": 24,
+        "source": "Bank of America",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 6,
+    "end_entity_id": 48,
+    "node_ids": [
+      6,
+      24,
+      48
+    ],
+    "nodes": [
+      "Bank of America",
+      "Financials",
+      "Visa"
+    ],
+    "edges": [
+      {
+        "source_id": 6,
+        "target_id": 24,
+        "source": "Bank of America",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 48,
+        "source": "Financials",
+        "target": "Visa",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 6,
+    "end_entity_id": 6,
+    "node_ids": [
+      6,
+      24,
+      6
+    ],
+    "nodes": [
+      "Bank of America",
+      "Financials",
+      "Bank of America"
+    ],
+    "edges": [
+      {
+        "source_id": 6,
+        "target_id": 24,
+        "source": "Bank of America",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 6,
+        "source": "Financials",
+        "target": "Bank of America",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 6,
+    "end_entity_id": 3,
+    "node_ids": [
+      6,
+      24,
+      3
+    ],
+    "nodes": [
+      "Bank of America",
+      "Financials",
+      "American Express"
+    ],
+    "edges": [
+      {
+        "source_id": 6,
+        "target_id": 24,
+        "source": "Bank of America",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 3,
+        "source": "Financials",
+        "target": "American Express",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 6,
+    "end_entity_id": 36,
+    "node_ids": [
+      6,
+      24,
+      36
+    ],
+    "nodes": [
+      "Bank of America",
+      "Financials",
+      "Moody's"
+    ],
+    "edges": [
+      {
+        "source_id": 6,
+        "target_id": 24,
+        "source": "Bank of America",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 36,
+        "source": "Financials",
+        "target": "Moody's",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 6,
+    "end_entity_id": 8,
+    "node_ids": [
+      6,
+      24,
+      8
+    ],
+    "nodes": [
+      "Bank of America",
+      "Financials",
+      "Berkshire Hathaway"
+    ],
+    "edges": [
+      {
+        "source_id": 6,
+        "target_id": 24,
+        "source": "Bank of America",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 8,
+        "source": "Financials",
+        "target": "Berkshire Hathaway",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 6,
+    "end_entity_id": 29,
+    "node_ids": [
+      6,
+      24,
+      29
+    ],
+    "nodes": [
+      "Bank of America",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 6,
+        "target_id": 24,
+        "source": "Bank of America",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 8,
+    "end_entity_id": 29,
+    "node_ids": [
+      8,
+      24,
+      29
+    ],
+    "nodes": [
+      "Berkshire Hathaway",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 8,
+        "target_id": 24,
+        "source": "Berkshire Hathaway",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 8,
+    "end_entity_id": 48,
+    "node_ids": [
+      8,
+      24,
+      48
+    ],
+    "nodes": [
+      "Berkshire Hathaway",
+      "Financials",
+      "Visa"
+    ],
+    "edges": [
+      {
+        "source_id": 8,
+        "target_id": 24,
+        "source": "Berkshire Hathaway",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 48,
+        "source": "Financials",
+        "target": "Visa",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 8,
+    "end_entity_id": 6,
+    "node_ids": [
+      8,
+      24,
+      6
+    ],
+    "nodes": [
+      "Berkshire Hathaway",
+      "Financials",
+      "Bank of America"
+    ],
+    "edges": [
+      {
+        "source_id": 8,
+        "target_id": 24,
+        "source": "Berkshire Hathaway",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 6,
+        "source": "Financials",
+        "target": "Bank of America",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 8,
+    "end_entity_id": 3,
+    "node_ids": [
+      8,
+      24,
+      3
+    ],
+    "nodes": [
+      "Berkshire Hathaway",
+      "Financials",
+      "American Express"
+    ],
+    "edges": [
+      {
+        "source_id": 8,
+        "target_id": 24,
+        "source": "Berkshire Hathaway",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 3,
+        "source": "Financials",
+        "target": "American Express",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 8,
+    "end_entity_id": 36,
+    "node_ids": [
+      8,
+      24,
+      36
+    ],
+    "nodes": [
+      "Berkshire Hathaway",
+      "Financials",
+      "Moody's"
+    ],
+    "edges": [
+      {
+        "source_id": 8,
+        "target_id": 24,
+        "source": "Berkshire Hathaway",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 36,
+        "source": "Financials",
+        "target": "Moody's",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 8,
+    "end_entity_id": 8,
+    "node_ids": [
+      8,
+      24,
+      8
+    ],
+    "nodes": [
+      "Berkshire Hathaway",
+      "Financials",
+      "Berkshire Hathaway"
+    ],
+    "edges": [
+      {
+        "source_id": 8,
+        "target_id": 24,
+        "source": "Berkshire Hathaway",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 8,
+        "source": "Financials",
+        "target": "Berkshire Hathaway",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 8,
+    "end_entity_id": 29,
+    "node_ids": [
+      8,
+      24,
+      29
+    ],
+    "nodes": [
+      "Berkshire Hathaway",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 8,
+        "target_id": 24,
+        "source": "Berkshire Hathaway",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 11,
+    "end_entity_id": 38,
+    "node_ids": [
+      11,
+      41,
+      38
+    ],
+    "nodes": [
+      "Broadcom",
+      "Semiconductors",
+      "Nvidia"
+    ],
+    "edges": [
+      {
+        "source_id": 11,
+        "target_id": 41,
+        "source": "Broadcom",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 38,
+        "source": "Semiconductors",
+        "target": "Nvidia",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 11,
+    "end_entity_id": 0,
+    "node_ids": [
+      11,
+      41,
+      0
+    ],
+    "nodes": [
+      "Broadcom",
+      "Semiconductors",
+      "ASML"
+    ],
+    "edges": [
+      {
+        "source_id": 11,
+        "target_id": 41,
+        "source": "Broadcom",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 0,
+        "source": "Semiconductors",
+        "target": "ASML",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 11,
+    "end_entity_id": 38,
+    "node_ids": [
+      11,
+      41,
+      38
+    ],
+    "nodes": [
+      "Broadcom",
+      "Semiconductors",
+      "Nvidia"
+    ],
+    "edges": [
+      {
+        "source_id": 11,
+        "target_id": 41,
+        "source": "Broadcom",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 38,
+        "source": "Semiconductors",
+        "target": "Nvidia",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 11,
+    "end_entity_id": 11,
+    "node_ids": [
+      11,
+      41,
+      11
+    ],
+    "nodes": [
+      "Broadcom",
+      "Semiconductors",
+      "Broadcom"
+    ],
+    "edges": [
+      {
+        "source_id": 11,
+        "target_id": 41,
+        "source": "Broadcom",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 11,
+        "source": "Semiconductors",
+        "target": "Broadcom",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 12,
+    "end_entity_id": 12,
+    "node_ids": [
+      12,
+      22,
+      12
+    ],
+    "nodes": [
+      "Chevron",
+      "Energy",
+      "Chevron"
+    ],
+    "edges": [
+      {
+        "source_id": 12,
+        "target_id": 22,
+        "source": "Chevron",
+        "target": "Energy",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 22,
+        "target_id": 12,
+        "source": "Energy",
+        "target": "Chevron",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 12,
+    "end_entity_id": 39,
+    "node_ids": [
+      12,
+      22,
+      39
+    ],
+    "nodes": [
+      "Chevron",
+      "Energy",
+      "Occidental Petroleum"
+    ],
+    "edges": [
+      {
+        "source_id": 12,
+        "target_id": 22,
+        "source": "Chevron",
+        "target": "Energy",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 22,
+        "target_id": 39,
+        "source": "Energy",
+        "target": "Occidental Petroleum",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 14,
+    "end_entity_id": 14,
+    "node_ids": [
+      14,
+      17,
+      14
+    ],
+    "nodes": [
+      "Coca-Cola",
+      "Consumer Staples",
+      "Coca-Cola"
+    ],
+    "edges": [
+      {
+        "source_id": 14,
+        "target_id": 17,
+        "source": "Coca-Cola",
+        "target": "Consumer Staples",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 17,
+        "target_id": 14,
+        "source": "Consumer Staples",
+        "target": "Coca-Cola",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 14,
+    "end_entity_id": 30,
+    "node_ids": [
+      14,
+      17,
+      30
+    ],
+    "nodes": [
+      "Coca-Cola",
+      "Consumer Staples",
+      "Kraft Heinz"
+    ],
+    "edges": [
+      {
+        "source_id": 14,
+        "target_id": 17,
+        "source": "Coca-Cola",
+        "target": "Consumer Staples",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 17,
+        "target_id": 30,
+        "source": "Consumer Staples",
+        "target": "Kraft Heinz",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 21,
+    "end_entity_id": 21,
+    "node_ids": [
+      21,
+      28,
+      21
+    ],
+    "nodes": [
+      "Eli Lilly",
+      "Health Care",
+      "Eli Lilly"
+    ],
+    "edges": [
+      {
+        "source_id": 21,
+        "target_id": 28,
+        "source": "Eli Lilly",
+        "target": "Health Care",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 28,
+        "target_id": 21,
+        "source": "Health Care",
+        "target": "Eli Lilly",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 29,
+    "node_ids": [
+      29,
+      24,
+      29
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 48,
+    "node_ids": [
+      29,
+      24,
+      48
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "Visa"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 48,
+        "source": "Financials",
+        "target": "Visa",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 6,
+    "node_ids": [
+      29,
+      24,
+      6
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "Bank of America"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 6,
+        "source": "Financials",
+        "target": "Bank of America",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 3,
+    "node_ids": [
+      29,
+      24,
+      3
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "American Express"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 3,
+        "source": "Financials",
+        "target": "American Express",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 36,
+    "node_ids": [
+      29,
+      24,
+      36
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "Moody's"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 36,
+        "source": "Financials",
+        "target": "Moody's",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 8,
+    "node_ids": [
+      29,
+      24,
+      8
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "Berkshire Hathaway"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 8,
+        "source": "Financials",
+        "target": "Berkshire Hathaway",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 29,
+    "node_ids": [
+      29,
+      24,
+      29
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 29,
+    "node_ids": [
+      29,
+      24,
+      29
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 48,
+    "node_ids": [
+      29,
+      24,
+      48
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "Visa"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 48,
+        "source": "Financials",
+        "target": "Visa",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 6,
+    "node_ids": [
+      29,
+      24,
+      6
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "Bank of America"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 6,
+        "source": "Financials",
+        "target": "Bank of America",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 3,
+    "node_ids": [
+      29,
+      24,
+      3
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "American Express"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 3,
+        "source": "Financials",
+        "target": "American Express",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 36,
+    "node_ids": [
+      29,
+      24,
+      36
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "Moody's"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 36,
+        "source": "Financials",
+        "target": "Moody's",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 8,
+    "node_ids": [
+      29,
+      24,
+      8
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "Berkshire Hathaway"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 8,
+        "source": "Financials",
+        "target": "Berkshire Hathaway",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 29,
+    "end_entity_id": 29,
+    "node_ids": [
+      29,
+      24,
+      29
+    ],
+    "nodes": [
+      "JPMorgan Chase",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 29,
+        "target_id": 24,
+        "source": "JPMorgan Chase",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 30,
+    "end_entity_id": 14,
+    "node_ids": [
+      30,
+      17,
+      14
+    ],
+    "nodes": [
+      "Kraft Heinz",
+      "Consumer Staples",
+      "Coca-Cola"
+    ],
+    "edges": [
+      {
+        "source_id": 30,
+        "target_id": 17,
+        "source": "Kraft Heinz",
+        "target": "Consumer Staples",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 17,
+        "target_id": 14,
+        "source": "Consumer Staples",
+        "target": "Coca-Cola",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 30,
+    "end_entity_id": 30,
+    "node_ids": [
+      30,
+      17,
+      30
+    ],
+    "nodes": [
+      "Kraft Heinz",
+      "Consumer Staples",
+      "Kraft Heinz"
+    ],
+    "edges": [
+      {
+        "source_id": 30,
+        "target_id": 17,
+        "source": "Kraft Heinz",
+        "target": "Consumer Staples",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 17,
+        "target_id": 30,
+        "source": "Consumer Staples",
+        "target": "Kraft Heinz",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 34,
+    "end_entity_id": 34,
+    "node_ids": [
+      34,
+      15,
+      34
+    ],
+    "nodes": [
+      "Meta Platforms",
+      "Communication Services",
+      "Meta Platforms"
+    ],
+    "edges": [
+      {
+        "source_id": 34,
+        "target_id": 15,
+        "source": "Meta Platforms",
+        "target": "Communication Services",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 15,
+        "target_id": 34,
+        "source": "Communication Services",
+        "target": "Meta Platforms",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 34,
+    "end_entity_id": 1,
+    "node_ids": [
+      34,
+      15,
+      1
+    ],
+    "nodes": [
+      "Meta Platforms",
+      "Communication Services",
+      "Alphabet"
+    ],
+    "edges": [
+      {
+        "source_id": 34,
+        "target_id": 15,
+        "source": "Meta Platforms",
+        "target": "Communication Services",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 15,
+        "target_id": 1,
+        "source": "Communication Services",
+        "target": "Alphabet",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 35,
+    "node_ids": [
+      35,
+      45,
+      35
+    ],
+    "nodes": [
+      "Microsoft",
+      "Technology",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 45,
+        "source": "Microsoft",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 35,
+        "source": "Technology",
+        "target": "Microsoft",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 4,
+    "node_ids": [
+      35,
+      45,
+      4
+    ],
+    "nodes": [
+      "Microsoft",
+      "Technology",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 45,
+        "source": "Microsoft",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 4,
+        "source": "Technology",
+        "target": "Apple Inc.",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 4,
+    "node_ids": [
+      35,
+      45,
+      4
+    ],
+    "nodes": [
+      "Microsoft",
+      "Technology",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 45,
+        "source": "Microsoft",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 4,
+        "source": "Technology",
+        "target": "Apple Inc.",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 35,
+    "node_ids": [
+      35,
+      45,
+      35
+    ],
+    "nodes": [
+      "Microsoft",
+      "Technology",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 45,
+        "source": "Microsoft",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 35,
+        "source": "Technology",
+        "target": "Microsoft",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 35,
+    "node_ids": [
+      35,
+      45,
+      35
+    ],
+    "nodes": [
+      "Microsoft",
+      "Technology",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 45,
+        "source": "Microsoft",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 35,
+        "source": "Technology",
+        "target": "Microsoft",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 4,
+    "node_ids": [
+      35,
+      45,
+      4
+    ],
+    "nodes": [
+      "Microsoft",
+      "Technology",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 45,
+        "source": "Microsoft",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 4,
+        "source": "Technology",
+        "target": "Apple Inc.",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 4,
+    "node_ids": [
+      35,
+      45,
+      4
+    ],
+    "nodes": [
+      "Microsoft",
+      "Technology",
+      "Apple Inc."
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 45,
+        "source": "Microsoft",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 4,
+        "source": "Technology",
+        "target": "Apple Inc.",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 35,
+    "end_entity_id": 35,
+    "node_ids": [
+      35,
+      45,
+      35
+    ],
+    "nodes": [
+      "Microsoft",
+      "Technology",
+      "Microsoft"
+    ],
+    "edges": [
+      {
+        "source_id": 35,
+        "target_id": 45,
+        "source": "Microsoft",
+        "target": "Technology",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 45,
+        "target_id": 35,
+        "source": "Technology",
+        "target": "Microsoft",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 36,
+    "end_entity_id": 29,
+    "node_ids": [
+      36,
+      24,
+      29
+    ],
+    "nodes": [
+      "Moody's",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 36,
+        "target_id": 24,
+        "source": "Moody's",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 36,
+    "end_entity_id": 48,
+    "node_ids": [
+      36,
+      24,
+      48
+    ],
+    "nodes": [
+      "Moody's",
+      "Financials",
+      "Visa"
+    ],
+    "edges": [
+      {
+        "source_id": 36,
+        "target_id": 24,
+        "source": "Moody's",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 48,
+        "source": "Financials",
+        "target": "Visa",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 36,
+    "end_entity_id": 6,
+    "node_ids": [
+      36,
+      24,
+      6
+    ],
+    "nodes": [
+      "Moody's",
+      "Financials",
+      "Bank of America"
+    ],
+    "edges": [
+      {
+        "source_id": 36,
+        "target_id": 24,
+        "source": "Moody's",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 6,
+        "source": "Financials",
+        "target": "Bank of America",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 36,
+    "end_entity_id": 3,
+    "node_ids": [
+      36,
+      24,
+      3
+    ],
+    "nodes": [
+      "Moody's",
+      "Financials",
+      "American Express"
+    ],
+    "edges": [
+      {
+        "source_id": 36,
+        "target_id": 24,
+        "source": "Moody's",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 3,
+        "source": "Financials",
+        "target": "American Express",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 36,
+    "end_entity_id": 36,
+    "node_ids": [
+      36,
+      24,
+      36
+    ],
+    "nodes": [
+      "Moody's",
+      "Financials",
+      "Moody's"
+    ],
+    "edges": [
+      {
+        "source_id": 36,
+        "target_id": 24,
+        "source": "Moody's",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 36,
+        "source": "Financials",
+        "target": "Moody's",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 36,
+    "end_entity_id": 8,
+    "node_ids": [
+      36,
+      24,
+      8
+    ],
+    "nodes": [
+      "Moody's",
+      "Financials",
+      "Berkshire Hathaway"
+    ],
+    "edges": [
+      {
+        "source_id": 36,
+        "target_id": 24,
+        "source": "Moody's",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 8,
+        "source": "Financials",
+        "target": "Berkshire Hathaway",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 36,
+    "end_entity_id": 29,
+    "node_ids": [
+      36,
+      24,
+      29
+    ],
+    "nodes": [
+      "Moody's",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 36,
+        "target_id": 24,
+        "source": "Moody's",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 38,
+    "end_entity_id": 38,
+    "node_ids": [
+      38,
+      41,
+      38
+    ],
+    "nodes": [
+      "Nvidia",
+      "Semiconductors",
+      "Nvidia"
+    ],
+    "edges": [
+      {
+        "source_id": 38,
+        "target_id": 41,
+        "source": "Nvidia",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 38,
+        "source": "Semiconductors",
+        "target": "Nvidia",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 38,
+    "end_entity_id": 0,
+    "node_ids": [
+      38,
+      41,
+      0
+    ],
+    "nodes": [
+      "Nvidia",
+      "Semiconductors",
+      "ASML"
+    ],
+    "edges": [
+      {
+        "source_id": 38,
+        "target_id": 41,
+        "source": "Nvidia",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 0,
+        "source": "Semiconductors",
+        "target": "ASML",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 38,
+    "end_entity_id": 38,
+    "node_ids": [
+      38,
+      41,
+      38
+    ],
+    "nodes": [
+      "Nvidia",
+      "Semiconductors",
+      "Nvidia"
+    ],
+    "edges": [
+      {
+        "source_id": 38,
+        "target_id": 41,
+        "source": "Nvidia",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 38,
+        "source": "Semiconductors",
+        "target": "Nvidia",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 38,
+    "end_entity_id": 11,
+    "node_ids": [
+      38,
+      41,
+      11
+    ],
+    "nodes": [
+      "Nvidia",
+      "Semiconductors",
+      "Broadcom"
+    ],
+    "edges": [
+      {
+        "source_id": 38,
+        "target_id": 41,
+        "source": "Nvidia",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 11,
+        "source": "Semiconductors",
+        "target": "Broadcom",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 38,
+    "end_entity_id": 38,
+    "node_ids": [
+      38,
+      41,
+      38
+    ],
+    "nodes": [
+      "Nvidia",
+      "Semiconductors",
+      "Nvidia"
+    ],
+    "edges": [
+      {
+        "source_id": 38,
+        "target_id": 41,
+        "source": "Nvidia",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 38,
+        "source": "Semiconductors",
+        "target": "Nvidia",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 38,
+    "end_entity_id": 0,
+    "node_ids": [
+      38,
+      41,
+      0
+    ],
+    "nodes": [
+      "Nvidia",
+      "Semiconductors",
+      "ASML"
+    ],
+    "edges": [
+      {
+        "source_id": 38,
+        "target_id": 41,
+        "source": "Nvidia",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 0,
+        "source": "Semiconductors",
+        "target": "ASML",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 38,
+    "end_entity_id": 38,
+    "node_ids": [
+      38,
+      41,
+      38
+    ],
+    "nodes": [
+      "Nvidia",
+      "Semiconductors",
+      "Nvidia"
+    ],
+    "edges": [
+      {
+        "source_id": 38,
+        "target_id": 41,
+        "source": "Nvidia",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 38,
+        "source": "Semiconductors",
+        "target": "Nvidia",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 38,
+    "end_entity_id": 11,
+    "node_ids": [
+      38,
+      41,
+      11
+    ],
+    "nodes": [
+      "Nvidia",
+      "Semiconductors",
+      "Broadcom"
+    ],
+    "edges": [
+      {
+        "source_id": 38,
+        "target_id": 41,
+        "source": "Nvidia",
+        "target": "Semiconductors",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 41,
+        "target_id": 11,
+        "source": "Semiconductors",
+        "target": "Broadcom",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 39,
+    "end_entity_id": 12,
+    "node_ids": [
+      39,
+      22,
+      12
+    ],
+    "nodes": [
+      "Occidental Petroleum",
+      "Energy",
+      "Chevron"
+    ],
+    "edges": [
+      {
+        "source_id": 39,
+        "target_id": 22,
+        "source": "Occidental Petroleum",
+        "target": "Energy",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 22,
+        "target_id": 12,
+        "source": "Energy",
+        "target": "Chevron",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 39,
+    "end_entity_id": 39,
+    "node_ids": [
+      39,
+      22,
+      39
+    ],
+    "nodes": [
+      "Occidental Petroleum",
+      "Energy",
+      "Occidental Petroleum"
+    ],
+    "edges": [
+      {
+        "source_id": 39,
+        "target_id": 22,
+        "source": "Occidental Petroleum",
+        "target": "Energy",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 22,
+        "target_id": 39,
+        "source": "Energy",
+        "target": "Occidental Petroleum",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 48,
+    "end_entity_id": 29,
+    "node_ids": [
+      48,
+      24,
+      29
+    ],
+    "nodes": [
+      "Visa",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 48,
+        "target_id": 24,
+        "source": "Visa",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 48,
+    "end_entity_id": 48,
+    "node_ids": [
+      48,
+      24,
+      48
+    ],
+    "nodes": [
+      "Visa",
+      "Financials",
+      "Visa"
+    ],
+    "edges": [
+      {
+        "source_id": 48,
+        "target_id": 24,
+        "source": "Visa",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 48,
+        "source": "Financials",
+        "target": "Visa",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 48,
+    "end_entity_id": 6,
+    "node_ids": [
+      48,
+      24,
+      6
+    ],
+    "nodes": [
+      "Visa",
+      "Financials",
+      "Bank of America"
+    ],
+    "edges": [
+      {
+        "source_id": 48,
+        "target_id": 24,
+        "source": "Visa",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 6,
+        "source": "Financials",
+        "target": "Bank of America",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 48,
+    "end_entity_id": 3,
+    "node_ids": [
+      48,
+      24,
+      3
+    ],
+    "nodes": [
+      "Visa",
+      "Financials",
+      "American Express"
+    ],
+    "edges": [
+      {
+        "source_id": 48,
+        "target_id": 24,
+        "source": "Visa",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 3,
+        "source": "Financials",
+        "target": "American Express",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 48,
+    "end_entity_id": 36,
+    "node_ids": [
+      48,
+      24,
+      36
+    ],
+    "nodes": [
+      "Visa",
+      "Financials",
+      "Moody's"
+    ],
+    "edges": [
+      {
+        "source_id": 48,
+        "target_id": 24,
+        "source": "Visa",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 36,
+        "source": "Financials",
+        "target": "Moody's",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 48,
+    "end_entity_id": 8,
+    "node_ids": [
+      48,
+      24,
+      8
+    ],
+    "nodes": [
+      "Visa",
+      "Financials",
+      "Berkshire Hathaway"
+    ],
+    "edges": [
+      {
+        "source_id": 48,
+        "target_id": 24,
+        "source": "Visa",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 8,
+        "source": "Financials",
+        "target": "Berkshire Hathaway",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  },
+  {
+    "start_entity_id": 48,
+    "end_entity_id": 29,
+    "node_ids": [
+      48,
+      24,
+      29
+    ],
+    "nodes": [
+      "Visa",
+      "Financials",
+      "JPMorgan Chase"
+    ],
+    "edges": [
+      {
+        "source_id": 48,
+        "target_id": 24,
+        "source": "Visa",
+        "target": "Financials",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      },
+      {
+        "source_id": 24,
+        "target_id": 29,
+        "source": "Financials",
+        "target": "JPMorgan Chase",
+        "relation": "belongs_to",
+        "relation_type_id": 0
+      }
+    ]
+  }
+]

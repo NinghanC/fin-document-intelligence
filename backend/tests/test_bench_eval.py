@@ -33,6 +33,43 @@ def load_real_holdings_eval_module():
     return module
 
 
+def load_metapath_training_export_module():
+    module_path = Path(__file__).resolve().parents[2] / "bench" / "export_metapath_training_data.py"
+    spec = importlib.util.spec_from_file_location("export_metapath_training_data", module_path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+
+def load_han_readiness_module():
+    module_path = Path(__file__).resolve().parents[2] / "bench" / "han_readiness_report.py"
+    spec = importlib.util.spec_from_file_location("han_readiness_report", module_path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+def load_han_export_module():
+    module_path = Path(__file__).resolve().parents[2] / "bench" / "export_han_data.py"
+    spec = importlib.util.spec_from_file_location("export_han_data", module_path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+def load_metapath_ranker_module():
+    module_path = Path(__file__).resolve().parents[2] / "bench" / "train_metapath_ranker.py"
+    spec = importlib.util.spec_from_file_location("train_metapath_ranker", module_path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 def load_live_eval_module():
     module_path = Path(__file__).resolve().parents[2] / "bench" / "run_live_eval.py"
@@ -157,6 +194,9 @@ def test_metapath_eval_dataset_reaches_expected_paths():
 
     assert result["total"] >= 16
     assert result["router_hit_rate"] == 1.0
+    assert 0 < result["router_top1_hit_rate"] <= result["router_hit_rate"]
+    assert 0 < result["average_router_precision"] <= 1.0
+    assert result["average_selected_metapaths"] >= 1.0
     assert result["routed_path_hit_rate"] == 1.0
     assert result["oracle_path_hit_rate"] == 1.0
     assert result["average_routed_path_recall"] == 1.0
@@ -177,6 +217,9 @@ def test_real_holdings_eval_dataset_reaches_expected_paths():
     assert result["holdings_rows"] >= 20
     assert result["questions"] >= 8
     assert result["router_hit_rate"] == 1.0
+    assert 0 < result["router_top1_hit_rate"] <= result["router_hit_rate"]
+    assert 0 < result["average_router_precision"] <= 1.0
+    assert result["average_selected_metapaths"] >= 1.0
     assert result["routed_path_hit_rate"] == 1.0
     assert result["oracle_path_hit_rate"] == 1.0
     assert result["average_routed_path_recall"] == 1.0
@@ -185,6 +228,109 @@ def test_real_holdings_eval_dataset_reaches_expected_paths():
     assert result["average_path_recall"] == result["average_routed_path_recall"]
     assert all(row["router_trace"] for row in result["rows"])
 
+
+def test_metapath_training_export_builds_pairwise_records(tmp_path):
+    module = load_metapath_training_export_module()
+    root = Path(__file__).resolve().parents[2]
+    synthetic = json.loads((root / "bench" / "metapath_dataset.json").read_text(encoding="utf-8"))
+    real_questions = json.loads((root / "bench" / "real_holdings" / "questions.json").read_text(encoding="utf-8"))
+
+    records = module.build_training_records(synthetic, real_questions)
+    summary = module.summarize(records)
+    output = tmp_path / "metapath_training.jsonl"
+    module.write_jsonl(records, output)
+    exported = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+
+    expected_queries = len(synthetic["questions"]) + len(real_questions)
+    assert summary["queries"] == expected_queries
+    assert summary["records"] == expected_queries * summary["candidate_metapaths"]
+    assert summary["positive_records"] == expected_queries
+    assert summary["negative_records"] == summary["records"] - expected_queries
+    assert 0 < summary["positive_top1_rate"] <= 1.0
+    assert exported == records
+    first = exported[0]
+    assert {
+        "query_id",
+        "query",
+        "candidate_metapath",
+        "candidate_steps",
+        "label",
+        "router_selected",
+        "router_score",
+        "matched_keywords",
+    } <= set(first)
+    assert {record["label"] for record in exported} == {0, 1}
+
+def test_han_export_builds_graph_artifacts(tmp_path):
+    module = load_han_export_module()
+    root = Path(__file__).resolve().parents[2]
+    synthetic = json.loads((root / "bench" / "metapath_dataset.json").read_text(encoding="utf-8"))
+    real_rows = module._read_csv(root / "bench" / "real_holdings" / "holdings_sample.csv")
+    real_questions = json.loads((root / "bench" / "real_holdings" / "questions.json").read_text(encoding="utf-8"))
+
+    artifacts = module.build_han_artifacts(synthetic, real_rows, real_questions)
+    module.write_han_artifacts(artifacts, tmp_path)
+    labels = [
+        json.loads(line)
+        for line in (tmp_path / "query_metapath_labels.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert artifacts["manifest"]["format"] == "han_ready_metapath_graph_v1"
+    assert artifacts["manifest"]["query_count"] == len(synthetic["questions"]) + len(real_questions)
+    assert artifacts["manifest"]["metapath_count"] == 8
+    assert artifacts["entities"]
+    assert artifacts["relations"]
+    assert len(labels) == artifacts["manifest"]["query_count"]
+    assert {"query_id", "positive_metapath_id", "start_entity_ids"} <= set(labels[0])
+    assert (tmp_path / "adjacency_by_metapath" / "sector_exposure.json").exists()
+    assert artifacts["adjacency_by_metapath"]["sector_exposure"]
+    assert artifacts["adjacency_by_metapath"]["shared_sector"]
+
+def test_han_readiness_report_blocks_small_labeled_sets(tmp_path):
+    export_module = load_metapath_training_export_module()
+    han_module = load_han_export_module()
+    readiness_module = load_han_readiness_module()
+    root = Path(__file__).resolve().parents[2]
+    synthetic = json.loads((root / "bench" / "metapath_dataset.json").read_text(encoding="utf-8"))
+    real_questions = json.loads((root / "bench" / "real_holdings" / "questions.json").read_text(encoding="utf-8"))
+    real_rows = export_module._read_csv(root / "bench" / "real_holdings" / "holdings_sample.csv")
+
+    records = export_module.build_training_records(synthetic, real_questions, real_rows)
+    training_path = tmp_path / "metapath_training.jsonl"
+    export_module.write_jsonl(records, training_path)
+    artifacts = han_module.build_han_artifacts(synthetic, real_rows, real_questions)
+    han_module.write_han_artifacts(artifacts, tmp_path)
+
+    conservative = readiness_module.build_report(training_path, tmp_path, min_queries=50, min_eval_queries=10)
+    relaxed = readiness_module.build_report(training_path, tmp_path, min_queries=20, min_eval_queries=8)
+
+    assert conservative["ready_for_han"] is False
+    assert "minimum_labeled_queries" in conservative["blockers"]
+    assert "minimum_eval_queries" in conservative["blockers"]
+    assert conservative["gates"]["learned_ranker_not_worse_than_rule"] is True
+    assert relaxed["ready_for_han"] is True
+
+def test_metapath_ranker_baseline_beats_or_matches_rule_router():
+    export_module = load_metapath_training_export_module()
+    ranker_module = load_metapath_ranker_module()
+    root = Path(__file__).resolve().parents[2]
+    synthetic = json.loads((root / "bench" / "metapath_dataset.json").read_text(encoding="utf-8"))
+    real_questions = json.loads((root / "bench" / "real_holdings" / "questions.json").read_text(encoding="utf-8"))
+    real_rows = export_module._read_csv(root / "bench" / "real_holdings" / "holdings_sample.csv")
+    records = export_module.build_training_records(synthetic, real_questions, real_rows)
+
+    train_records, eval_records = ranker_module.split_records(
+        records,
+        "synthetic_finance_graph",
+        "real_13f_style_holdings",
+    )
+    weights = ranker_module.train_pairwise_ranker(train_records, epochs=40, learning_rate=0.03)
+    result = ranker_module.evaluate_ranker(eval_records, weights)
+
+    assert result["queries"] == len(real_questions)
+    assert result["learned_top1_hit_rate"] >= result["rule_top1_hit_rate"]
+    assert result["learned_mrr"] >= result["rule_mrr"]
+    assert ranker_module.top_weights(weights)
 
 def test_live_eval_questions_exclude_graph_inference_scope():
     questions_path = Path(__file__).resolve().parents[2] / "bench" / "live_eval" / "questions.json"

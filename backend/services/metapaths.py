@@ -197,31 +197,46 @@ def validate_all_metapaths(specs: dict[str, MetapathSpec] | None = None) -> None
         validate_metapath(spec)
 
 
-class MetapathRouter:
-    """Select finance-domain metapaths using transparent query rules."""
+class CandidateMetapathGenerator:
+    """Produce candidate metapaths before ranking.
+
+    The current generator intentionally returns every validated finance metapath.
+    This keeps recall high and makes the ranking stage the explicit replacement
+    point for a learned router or HAN-style attention layer.
+    """
 
     def __init__(self, specs: dict[str, MetapathSpec] | None = None) -> None:
         self.specs = specs or FINANCIAL_METAPATHS
         validate_all_metapaths(self.specs)
 
-    def select(self, query: str, entities: list[str] | None = None, limit: int = 3) -> list[MetapathSpec]:
-        return [selection.spec for selection in self.select_with_trace(query, entities, limit)]
+    def generate(self, query: str, entities: list[str] | None = None) -> list[MetapathSpec]:
+        del query, entities
+        return list(self.specs.values())
 
-    def select_with_trace(
+
+class RuleMetapathRanker:
+    """Rank candidate metapaths with transparent keyword rules."""
+
+    def __init__(self, fallback_names: tuple[str, ...] | None = None) -> None:
+        self.fallback_names = fallback_names or ("sector_exposure", "geographic_risk", "compliance_chain")
+
+    def rank(
         self,
         query: str,
+        candidates: list[MetapathSpec],
         entities: list[str] | None = None,
         limit: int = 3,
     ) -> list[MetapathSelection]:
         lowered = query.lower()
+        candidate_by_name = {candidate.name: candidate for candidate in candidates}
         scored: list[tuple[int, str, MetapathSelection]] = []
-        for name, spec in self.specs.items():
+        for spec in candidates:
             matched_keywords = tuple(keyword for keyword in spec.keywords if self._keyword_matches(lowered, keyword))
             score = len(matched_keywords)
             if score:
                 scored.append((
                     score,
-                    name,
+                    spec.name,
                     MetapathSelection(
                         spec=spec,
                         score=score,
@@ -231,14 +246,15 @@ class MetapathRouter:
                 ))
 
         if not scored and entities:
-            fallback_names = ("sector_exposure", "geographic_risk", "compliance_chain")
-            for name in fallback_names:
-                spec = self.specs[name]
+            for name in self.fallback_names:
+                fallback_spec = candidate_by_name.get(name)
+                if fallback_spec is None:
+                    continue
                 scored.append((
                     1,
                     name,
                     MetapathSelection(
-                        spec=spec,
+                        spec=fallback_spec,
                         score=1,
                         matched_keywords=(),
                         reason="fallback for linked financial entities without a more specific query term",
@@ -255,3 +271,29 @@ class MetapathRouter:
         if "\\ " in escaped:
             return re.search(rf"(?<!\w){escaped}(?!\w)", lowered_query) is not None
         return re.search(rf"(?<!\w){escaped}s?(?!\w)", lowered_query) is not None
+
+
+class MetapathRouter:
+    """Backward-compatible facade over candidate generation and ranking."""
+
+    def __init__(
+        self,
+        specs: dict[str, MetapathSpec] | None = None,
+        generator: CandidateMetapathGenerator | None = None,
+        ranker: RuleMetapathRanker | None = None,
+    ) -> None:
+        self.generator = generator or CandidateMetapathGenerator(specs)
+        self.ranker = ranker or RuleMetapathRanker()
+        self.specs = self.generator.specs
+
+    def select(self, query: str, entities: list[str] | None = None, limit: int = 3) -> list[MetapathSpec]:
+        return [selection.spec for selection in self.select_with_trace(query, entities, limit)]
+
+    def select_with_trace(
+        self,
+        query: str,
+        entities: list[str] | None = None,
+        limit: int = 3,
+    ) -> list[MetapathSelection]:
+        candidates = self.generator.generate(query, entities)
+        return self.ranker.rank(query, candidates, entities, limit)

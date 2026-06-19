@@ -1,0 +1,1538 @@
+[
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 46,
+    "node_ids": [
+      9,
+      4,
+      46
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "Apple Inc.",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 4,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 46,
+        "source": "Apple Inc.",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 46,
+    "node_ids": [
+      9,
+      4,
+      46
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "Apple Inc.",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 4,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 46,
+        "source": "Apple Inc.",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 46,
+    "node_ids": [
+      9,
+      6,
+      46
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "Bank of America",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 6,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "Bank of America",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 6,
+        "target_id": 46,
+        "source": "Bank of America",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 46,
+    "node_ids": [
+      9,
+      3,
+      46
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "American Express",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 3,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "American Express",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 3,
+        "target_id": 46,
+        "source": "American Express",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 46,
+    "node_ids": [
+      9,
+      14,
+      46
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "Coca-Cola",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 14,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "Coca-Cola",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 14,
+        "target_id": 46,
+        "source": "Coca-Cola",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 46,
+    "node_ids": [
+      9,
+      12,
+      46
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "Chevron",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 12,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "Chevron",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 12,
+        "target_id": 46,
+        "source": "Chevron",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 46,
+    "node_ids": [
+      9,
+      39,
+      46
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "Occidental Petroleum",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 39,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "Occidental Petroleum",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 39,
+        "target_id": 46,
+        "source": "Occidental Petroleum",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 46,
+    "node_ids": [
+      9,
+      30,
+      46
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "Kraft Heinz",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 30,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "Kraft Heinz",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 30,
+        "target_id": 46,
+        "source": "Kraft Heinz",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 9,
+    "end_entity_id": 46,
+    "node_ids": [
+      9,
+      36,
+      46
+    ],
+    "nodes": [
+      "Berkshire Hathaway 13F Portfolio",
+      "Moody's",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 9,
+        "target_id": 36,
+        "source": "Berkshire Hathaway 13F Portfolio",
+        "target": "Moody's",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 36,
+        "target_id": 46,
+        "source": "Moody's",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      4,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Apple Inc.",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 4,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 46,
+        "source": "Apple Inc.",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      4,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Apple Inc.",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 4,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 46,
+        "source": "Apple Inc.",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      35,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Microsoft",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 35,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 46,
+        "source": "Microsoft",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      35,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Microsoft",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 35,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 46,
+        "source": "Microsoft",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      38,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Nvidia",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 38,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 46,
+        "source": "Nvidia",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      38,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Nvidia",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 38,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 46,
+        "source": "Nvidia",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      11,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Broadcom",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 11,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Broadcom",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 11,
+        "target_id": 46,
+        "source": "Broadcom",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      2,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Amazon",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 2,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Amazon",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 2,
+        "target_id": 46,
+        "source": "Amazon",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      34,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Meta Platforms",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 34,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Meta Platforms",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 34,
+        "target_id": 46,
+        "source": "Meta Platforms",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      1,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Alphabet",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 1,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Alphabet",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 1,
+        "target_id": 46,
+        "source": "Alphabet",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      8,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "Berkshire Hathaway",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 8,
+        "source": "BlackRock 13F Portfolio",
+        "target": "Berkshire Hathaway",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 8,
+        "target_id": 46,
+        "source": "Berkshire Hathaway",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      29,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "JPMorgan Chase",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 29,
+        "source": "BlackRock 13F Portfolio",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 46,
+        "source": "JPMorgan Chase",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 10,
+    "end_entity_id": 46,
+    "node_ids": [
+      10,
+      29,
+      46
+    ],
+    "nodes": [
+      "BlackRock 13F Portfolio",
+      "JPMorgan Chase",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 10,
+        "target_id": 29,
+        "source": "BlackRock 13F Portfolio",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 46,
+        "source": "JPMorgan Chase",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 20,
+    "end_entity_id": 46,
+    "node_ids": [
+      20,
+      29,
+      46
+    ],
+    "nodes": [
+      "Defensive Credit Fund",
+      "JPMorgan Chase",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 20,
+        "target_id": 29,
+        "source": "Defensive Credit Fund",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 46,
+        "source": "JPMorgan Chase",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 20,
+    "end_entity_id": 46,
+    "node_ids": [
+      20,
+      29,
+      46
+    ],
+    "nodes": [
+      "Defensive Credit Fund",
+      "JPMorgan Chase",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 20,
+        "target_id": 29,
+        "source": "Defensive Credit Fund",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 46,
+        "source": "JPMorgan Chase",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 20,
+    "end_entity_id": 46,
+    "node_ids": [
+      20,
+      48,
+      46
+    ],
+    "nodes": [
+      "Defensive Credit Fund",
+      "Visa",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 20,
+        "target_id": 48,
+        "source": "Defensive Credit Fund",
+        "target": "Visa",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 48,
+        "target_id": 46,
+        "source": "Visa",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 46,
+    "node_ids": [
+      27,
+      35,
+      46
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "Microsoft",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 35,
+        "source": "Global Income Fund",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 46,
+        "source": "Microsoft",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 46,
+    "node_ids": [
+      27,
+      35,
+      46
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "Microsoft",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 35,
+        "source": "Global Income Fund",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 46,
+        "source": "Microsoft",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 46,
+    "node_ids": [
+      27,
+      29,
+      46
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "JPMorgan Chase",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 29,
+        "source": "Global Income Fund",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 46,
+        "source": "JPMorgan Chase",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 46,
+    "node_ids": [
+      27,
+      29,
+      46
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "JPMorgan Chase",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 29,
+        "source": "Global Income Fund",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 46,
+        "source": "JPMorgan Chase",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 27,
+    "end_entity_id": 46,
+    "node_ids": [
+      27,
+      48,
+      46
+    ],
+    "nodes": [
+      "Global Income Fund",
+      "Visa",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 27,
+        "target_id": 48,
+        "source": "Global Income Fund",
+        "target": "Visa",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 48,
+        "target_id": 46,
+        "source": "Visa",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 42,
+    "end_entity_id": 46,
+    "node_ids": [
+      42,
+      4,
+      46
+    ],
+    "nodes": [
+      "Strategic Growth Fund",
+      "Apple Inc.",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 42,
+        "target_id": 4,
+        "source": "Strategic Growth Fund",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 46,
+        "source": "Apple Inc.",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 42,
+    "end_entity_id": 46,
+    "node_ids": [
+      42,
+      4,
+      46
+    ],
+    "nodes": [
+      "Strategic Growth Fund",
+      "Apple Inc.",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 42,
+        "target_id": 4,
+        "source": "Strategic Growth Fund",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 46,
+        "source": "Apple Inc.",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 42,
+    "end_entity_id": 46,
+    "node_ids": [
+      42,
+      38,
+      46
+    ],
+    "nodes": [
+      "Strategic Growth Fund",
+      "Nvidia",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 42,
+        "target_id": 38,
+        "source": "Strategic Growth Fund",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 46,
+        "source": "Nvidia",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 42,
+    "end_entity_id": 46,
+    "node_ids": [
+      42,
+      38,
+      46
+    ],
+    "nodes": [
+      "Strategic Growth Fund",
+      "Nvidia",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 42,
+        "target_id": 38,
+        "source": "Strategic Growth Fund",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 46,
+        "source": "Nvidia",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 42,
+    "end_entity_id": 37,
+    "node_ids": [
+      42,
+      0,
+      37
+    ],
+    "nodes": [
+      "Strategic Growth Fund",
+      "ASML",
+      "Netherlands"
+    ],
+    "edges": [
+      {
+        "source_id": 42,
+        "target_id": 0,
+        "source": "Strategic Growth Fund",
+        "target": "ASML",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 0,
+        "target_id": 37,
+        "source": "ASML",
+        "target": "Netherlands",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      4,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Apple Inc.",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 4,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 46,
+        "source": "Apple Inc.",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      4,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Apple Inc.",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 4,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Apple Inc.",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 4,
+        "target_id": 46,
+        "source": "Apple Inc.",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      35,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Microsoft",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 35,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 46,
+        "source": "Microsoft",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      35,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Microsoft",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 35,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Microsoft",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 35,
+        "target_id": 46,
+        "source": "Microsoft",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      38,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Nvidia",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 38,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 46,
+        "source": "Nvidia",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      38,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Nvidia",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 38,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Nvidia",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 38,
+        "target_id": 46,
+        "source": "Nvidia",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      11,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Broadcom",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 11,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Broadcom",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 11,
+        "target_id": 46,
+        "source": "Broadcom",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      2,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Amazon",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 2,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Amazon",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 2,
+        "target_id": 46,
+        "source": "Amazon",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      1,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Alphabet",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 1,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Alphabet",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 1,
+        "target_id": 46,
+        "source": "Alphabet",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      34,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Meta Platforms",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 34,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Meta Platforms",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 34,
+        "target_id": 46,
+        "source": "Meta Platforms",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      21,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "Eli Lilly",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 21,
+        "source": "Vanguard 13F Portfolio",
+        "target": "Eli Lilly",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 21,
+        "target_id": 46,
+        "source": "Eli Lilly",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      29,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "JPMorgan Chase",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 29,
+        "source": "Vanguard 13F Portfolio",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 46,
+        "source": "JPMorgan Chase",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  },
+  {
+    "start_entity_id": 47,
+    "end_entity_id": 46,
+    "node_ids": [
+      47,
+      29,
+      46
+    ],
+    "nodes": [
+      "Vanguard 13F Portfolio",
+      "JPMorgan Chase",
+      "United States"
+    ],
+    "edges": [
+      {
+        "source_id": 47,
+        "target_id": 29,
+        "source": "Vanguard 13F Portfolio",
+        "target": "JPMorgan Chase",
+        "relation": "holds",
+        "relation_type_id": 2
+      },
+      {
+        "source_id": 29,
+        "target_id": 46,
+        "source": "JPMorgan Chase",
+        "target": "United States",
+        "relation": "located_in",
+        "relation_type_id": 3
+      }
+    ]
+  }
+]

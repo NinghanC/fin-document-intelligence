@@ -1,0 +1,972 @@
+[
+  {
+    "id": 0,
+    "head_id": 27,
+    "tail_id": 35,
+    "head": "Global Income Fund",
+    "tail": "Microsoft",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 1,
+    "head_id": 27,
+    "tail_id": 29,
+    "head": "Global Income Fund",
+    "tail": "JPMorgan Chase",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 2,
+    "head_id": 27,
+    "tail_id": 48,
+    "head": "Global Income Fund",
+    "tail": "Visa",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 3,
+    "head_id": 42,
+    "tail_id": 4,
+    "head": "Strategic Growth Fund",
+    "tail": "Apple Inc.",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 4,
+    "head_id": 42,
+    "tail_id": 38,
+    "head": "Strategic Growth Fund",
+    "tail": "Nvidia",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 5,
+    "head_id": 42,
+    "tail_id": 0,
+    "head": "Strategic Growth Fund",
+    "tail": "ASML",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 6,
+    "head_id": 20,
+    "tail_id": 29,
+    "head": "Defensive Credit Fund",
+    "tail": "JPMorgan Chase",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 7,
+    "head_id": 20,
+    "tail_id": 48,
+    "head": "Defensive Credit Fund",
+    "tail": "Visa",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 8,
+    "head_id": 35,
+    "tail_id": 45,
+    "head": "Microsoft",
+    "tail": "Technology",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 9,
+    "head_id": 4,
+    "tail_id": 45,
+    "head": "Apple Inc.",
+    "tail": "Technology",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 10,
+    "head_id": 29,
+    "tail_id": 24,
+    "head": "JPMorgan Chase",
+    "tail": "Financials",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 11,
+    "head_id": 48,
+    "tail_id": 24,
+    "head": "Visa",
+    "tail": "Financials",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 12,
+    "head_id": 38,
+    "tail_id": 41,
+    "head": "Nvidia",
+    "tail": "Semiconductors",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 13,
+    "head_id": 0,
+    "tail_id": 41,
+    "head": "ASML",
+    "tail": "Semiconductors",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 14,
+    "head_id": 35,
+    "tail_id": 46,
+    "head": "Microsoft",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 15,
+    "head_id": 4,
+    "tail_id": 46,
+    "head": "Apple Inc.",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 16,
+    "head_id": 29,
+    "tail_id": 46,
+    "head": "JPMorgan Chase",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 17,
+    "head_id": 48,
+    "tail_id": 46,
+    "head": "Visa",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 18,
+    "head_id": 38,
+    "tail_id": 46,
+    "head": "Nvidia",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 19,
+    "head_id": 0,
+    "tail_id": 37,
+    "head": "ASML",
+    "tail": "Netherlands",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 20,
+    "head_id": 35,
+    "tail_id": 5,
+    "head": "Microsoft",
+    "tail": "Azure",
+    "relation": "uses",
+    "relation_type_id": 7,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 21,
+    "head_id": 29,
+    "tail_id": 18,
+    "head": "JPMorgan Chase",
+    "tail": "Core Banking Platform",
+    "relation": "uses",
+    "relation_type_id": 7,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 22,
+    "head_id": 38,
+    "tail_id": 26,
+    "head": "Nvidia",
+    "tail": "GPU Acceleration",
+    "relation": "uses",
+    "relation_type_id": 7,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 23,
+    "head_id": 35,
+    "tail_id": 13,
+    "head": "Microsoft",
+    "tail": "CloudOps Europe",
+    "relation": "depends_on",
+    "relation_type_id": 1,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 24,
+    "head_id": 4,
+    "tail_id": 44,
+    "head": "Apple Inc.",
+    "tail": "Taiwan Semiconductor Manufacturing",
+    "relation": "depends_on",
+    "relation_type_id": 1,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 25,
+    "head_id": 38,
+    "tail_id": 44,
+    "head": "Nvidia",
+    "tail": "Taiwan Semiconductor Manufacturing",
+    "relation": "depends_on",
+    "relation_type_id": 1,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 26,
+    "head_id": 0,
+    "tail_id": 13,
+    "head": "ASML",
+    "tail": "CloudOps Europe",
+    "relation": "depends_on",
+    "relation_type_id": 1,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 27,
+    "head_id": 29,
+    "tail_id": 7,
+    "head": "JPMorgan Chase",
+    "tail": "Basel III",
+    "relation": "subject_to",
+    "relation_type_id": 6,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 28,
+    "head_id": 48,
+    "tail_id": 40,
+    "head": "Visa",
+    "tail": "SEC Liquidity Rule",
+    "relation": "subject_to",
+    "relation_type_id": 6,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 29,
+    "head_id": 27,
+    "tail_id": 31,
+    "head": "Global Income Fund",
+    "tail": "Liquidity Risk",
+    "relation": "related_to",
+    "relation_type_id": 5,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 30,
+    "head_id": 42,
+    "tail_id": 43,
+    "head": "Strategic Growth Fund",
+    "tail": "Supply Chain Risk",
+    "relation": "related_to",
+    "relation_type_id": 5,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 31,
+    "head_id": 32,
+    "tail_id": 35,
+    "head": "Maria Chen",
+    "tail": "Microsoft",
+    "relation": "works_at",
+    "relation_type_id": 8,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 32,
+    "head_id": 32,
+    "tail_id": 4,
+    "head": "Maria Chen",
+    "tail": "Apple Inc.",
+    "relation": "works_at",
+    "relation_type_id": 8,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 33,
+    "head_id": 19,
+    "tail_id": 29,
+    "head": "David Morgan",
+    "tail": "JPMorgan Chase",
+    "relation": "works_at",
+    "relation_type_id": 8,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 34,
+    "head_id": 19,
+    "tail_id": 48,
+    "head": "David Morgan",
+    "tail": "Visa",
+    "relation": "works_at",
+    "relation_type_id": 8,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 35,
+    "head_id": 29,
+    "tail_id": 25,
+    "head": "JPMorgan Chase",
+    "tail": "First Data Services",
+    "relation": "owns",
+    "relation_type_id": 4,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 36,
+    "head_id": 25,
+    "tail_id": 33,
+    "head": "First Data Services",
+    "tail": "Merchant Services Europe",
+    "relation": "owns",
+    "relation_type_id": 4,
+    "dataset": "synthetic_finance_graph"
+  },
+  {
+    "id": 37,
+    "head_id": 9,
+    "tail_id": 4,
+    "head": "Berkshire Hathaway 13F Portfolio",
+    "tail": "Apple Inc.",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 38,
+    "head_id": 4,
+    "tail_id": 45,
+    "head": "Apple Inc.",
+    "tail": "Technology",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 39,
+    "head_id": 4,
+    "tail_id": 46,
+    "head": "Apple Inc.",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 40,
+    "head_id": 9,
+    "tail_id": 6,
+    "head": "Berkshire Hathaway 13F Portfolio",
+    "tail": "Bank of America",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 41,
+    "head_id": 6,
+    "tail_id": 24,
+    "head": "Bank of America",
+    "tail": "Financials",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 42,
+    "head_id": 6,
+    "tail_id": 46,
+    "head": "Bank of America",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 43,
+    "head_id": 9,
+    "tail_id": 3,
+    "head": "Berkshire Hathaway 13F Portfolio",
+    "tail": "American Express",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 44,
+    "head_id": 3,
+    "tail_id": 24,
+    "head": "American Express",
+    "tail": "Financials",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 45,
+    "head_id": 3,
+    "tail_id": 46,
+    "head": "American Express",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 46,
+    "head_id": 9,
+    "tail_id": 14,
+    "head": "Berkshire Hathaway 13F Portfolio",
+    "tail": "Coca-Cola",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 47,
+    "head_id": 14,
+    "tail_id": 17,
+    "head": "Coca-Cola",
+    "tail": "Consumer Staples",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 48,
+    "head_id": 14,
+    "tail_id": 46,
+    "head": "Coca-Cola",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 49,
+    "head_id": 9,
+    "tail_id": 12,
+    "head": "Berkshire Hathaway 13F Portfolio",
+    "tail": "Chevron",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 50,
+    "head_id": 12,
+    "tail_id": 22,
+    "head": "Chevron",
+    "tail": "Energy",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 51,
+    "head_id": 12,
+    "tail_id": 46,
+    "head": "Chevron",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 52,
+    "head_id": 9,
+    "tail_id": 39,
+    "head": "Berkshire Hathaway 13F Portfolio",
+    "tail": "Occidental Petroleum",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 53,
+    "head_id": 39,
+    "tail_id": 22,
+    "head": "Occidental Petroleum",
+    "tail": "Energy",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 54,
+    "head_id": 39,
+    "tail_id": 46,
+    "head": "Occidental Petroleum",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 55,
+    "head_id": 9,
+    "tail_id": 30,
+    "head": "Berkshire Hathaway 13F Portfolio",
+    "tail": "Kraft Heinz",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 56,
+    "head_id": 30,
+    "tail_id": 17,
+    "head": "Kraft Heinz",
+    "tail": "Consumer Staples",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 57,
+    "head_id": 30,
+    "tail_id": 46,
+    "head": "Kraft Heinz",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 58,
+    "head_id": 9,
+    "tail_id": 36,
+    "head": "Berkshire Hathaway 13F Portfolio",
+    "tail": "Moody's",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 59,
+    "head_id": 36,
+    "tail_id": 24,
+    "head": "Moody's",
+    "tail": "Financials",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 60,
+    "head_id": 36,
+    "tail_id": 46,
+    "head": "Moody's",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 61,
+    "head_id": 10,
+    "tail_id": 4,
+    "head": "BlackRock 13F Portfolio",
+    "tail": "Apple Inc.",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 62,
+    "head_id": 10,
+    "tail_id": 35,
+    "head": "BlackRock 13F Portfolio",
+    "tail": "Microsoft",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 63,
+    "head_id": 35,
+    "tail_id": 45,
+    "head": "Microsoft",
+    "tail": "Technology",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 64,
+    "head_id": 35,
+    "tail_id": 46,
+    "head": "Microsoft",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 65,
+    "head_id": 10,
+    "tail_id": 38,
+    "head": "BlackRock 13F Portfolio",
+    "tail": "Nvidia",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 66,
+    "head_id": 38,
+    "tail_id": 41,
+    "head": "Nvidia",
+    "tail": "Semiconductors",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 67,
+    "head_id": 38,
+    "tail_id": 46,
+    "head": "Nvidia",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 68,
+    "head_id": 10,
+    "tail_id": 11,
+    "head": "BlackRock 13F Portfolio",
+    "tail": "Broadcom",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 69,
+    "head_id": 11,
+    "tail_id": 41,
+    "head": "Broadcom",
+    "tail": "Semiconductors",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 70,
+    "head_id": 11,
+    "tail_id": 46,
+    "head": "Broadcom",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 71,
+    "head_id": 10,
+    "tail_id": 2,
+    "head": "BlackRock 13F Portfolio",
+    "tail": "Amazon",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 72,
+    "head_id": 2,
+    "tail_id": 16,
+    "head": "Amazon",
+    "tail": "Consumer Discretionary",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 73,
+    "head_id": 2,
+    "tail_id": 46,
+    "head": "Amazon",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 74,
+    "head_id": 10,
+    "tail_id": 34,
+    "head": "BlackRock 13F Portfolio",
+    "tail": "Meta Platforms",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 75,
+    "head_id": 34,
+    "tail_id": 15,
+    "head": "Meta Platforms",
+    "tail": "Communication Services",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 76,
+    "head_id": 34,
+    "tail_id": 46,
+    "head": "Meta Platforms",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 77,
+    "head_id": 10,
+    "tail_id": 1,
+    "head": "BlackRock 13F Portfolio",
+    "tail": "Alphabet",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 78,
+    "head_id": 1,
+    "tail_id": 15,
+    "head": "Alphabet",
+    "tail": "Communication Services",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 79,
+    "head_id": 1,
+    "tail_id": 46,
+    "head": "Alphabet",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 80,
+    "head_id": 10,
+    "tail_id": 8,
+    "head": "BlackRock 13F Portfolio",
+    "tail": "Berkshire Hathaway",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 81,
+    "head_id": 8,
+    "tail_id": 24,
+    "head": "Berkshire Hathaway",
+    "tail": "Financials",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 82,
+    "head_id": 8,
+    "tail_id": 46,
+    "head": "Berkshire Hathaway",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 83,
+    "head_id": 10,
+    "tail_id": 29,
+    "head": "BlackRock 13F Portfolio",
+    "tail": "JPMorgan Chase",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 84,
+    "head_id": 29,
+    "tail_id": 24,
+    "head": "JPMorgan Chase",
+    "tail": "Financials",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 85,
+    "head_id": 29,
+    "tail_id": 46,
+    "head": "JPMorgan Chase",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 86,
+    "head_id": 47,
+    "tail_id": 4,
+    "head": "Vanguard 13F Portfolio",
+    "tail": "Apple Inc.",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 87,
+    "head_id": 47,
+    "tail_id": 35,
+    "head": "Vanguard 13F Portfolio",
+    "tail": "Microsoft",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 88,
+    "head_id": 47,
+    "tail_id": 38,
+    "head": "Vanguard 13F Portfolio",
+    "tail": "Nvidia",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 89,
+    "head_id": 47,
+    "tail_id": 11,
+    "head": "Vanguard 13F Portfolio",
+    "tail": "Broadcom",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 90,
+    "head_id": 47,
+    "tail_id": 2,
+    "head": "Vanguard 13F Portfolio",
+    "tail": "Amazon",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 91,
+    "head_id": 47,
+    "tail_id": 1,
+    "head": "Vanguard 13F Portfolio",
+    "tail": "Alphabet",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 92,
+    "head_id": 47,
+    "tail_id": 34,
+    "head": "Vanguard 13F Portfolio",
+    "tail": "Meta Platforms",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 93,
+    "head_id": 47,
+    "tail_id": 21,
+    "head": "Vanguard 13F Portfolio",
+    "tail": "Eli Lilly",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 94,
+    "head_id": 21,
+    "tail_id": 28,
+    "head": "Eli Lilly",
+    "tail": "Health Care",
+    "relation": "belongs_to",
+    "relation_type_id": 0,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 95,
+    "head_id": 21,
+    "tail_id": 46,
+    "head": "Eli Lilly",
+    "tail": "United States",
+    "relation": "located_in",
+    "relation_type_id": 3,
+    "dataset": "real_13f_style_holdings"
+  },
+  {
+    "id": 96,
+    "head_id": 47,
+    "tail_id": 29,
+    "head": "Vanguard 13F Portfolio",
+    "tail": "JPMorgan Chase",
+    "relation": "holds",
+    "relation_type_id": 2,
+    "dataset": "real_13f_style_holdings"
+  }
+]

@@ -16,7 +16,13 @@ from services.graph_rag import GraphRAGContext, GraphRAGPipeline
 from services.ingestion_registry import ingestion_registry
 from services.knowledge_graph import KnowledgeGraphService
 from services.logical_inference import LogicalInferenceEngine
-from services.metapaths import FINANCIAL_METAPATHS, MetapathRouter, validate_all_metapaths
+from services.metapaths import (
+    FINANCIAL_METAPATHS,
+    CandidateMetapathGenerator,
+    MetapathRouter,
+    RuleMetapathRanker,
+    validate_all_metapaths,
+)
 from services.vector_store import _SubprocessEmbeddings
 
 
@@ -60,6 +66,16 @@ def test_financial_metapaths_validate_and_route_by_domain_terms():
     assert "compliance_chain" not in {selection.spec.name for selection in traced}
     assert FINANCIAL_METAPATHS["shared_sector"].steps[1].direction == "in"
 
+
+def test_metapath_candidate_generator_and_rule_ranker_are_separate():
+    generator = CandidateMetapathGenerator()
+    ranker = RuleMetapathRanker()
+    candidates = generator.generate("Which sectors is Global Income Fund exposed to?", ["Global Income Fund"])
+    selections = ranker.rank("Which sectors is Global Income Fund exposed to?", candidates, ["Global Income Fund"])
+
+    assert {candidate.name for candidate in candidates} == set(FINANCIAL_METAPATHS)
+    assert selections[0].spec.name == "sector_exposure"
+    assert selections[0].matched_keywords == ("sector",)
 
 def test_llm_community_summarizer_requires_real_provider_key(monkeypatch):
     monkeypatch.setattr(community_summarizer_module.settings, "community_summary_provider", "llm")
