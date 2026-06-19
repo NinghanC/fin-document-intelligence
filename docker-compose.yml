@@ -37,12 +37,22 @@ services:
       POSTGRES_DB: knowledge
     volumes:
       - pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d knowledge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.0
     container_name: finsight-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+    healthcheck:
+      test: ["CMD-SHELL", "cub zk-ready localhost:2181 10"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka:
     image: confluentinc/cp-kafka:7.7.0
@@ -58,7 +68,13 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:9092 1 20"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
 
   api:
     build:
@@ -71,11 +87,21 @@ services:
       - ./backend/.env
     environment:
       ANONYMIZED_TELEMETRY: "false"
+      NEO4J_URI: bolt://neo4j:7687
+      CHROMA_MODE: http
+      CHROMA_HOST: chromadb
+      PGVECTOR_DSN: postgresql://postgres:postgres@pgvector:5432/knowledge
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      API_STATE_DSN: postgresql://postgres:postgres@pgvector:5432/knowledge
     depends_on:
-      - neo4j
-      - chromadb
-      - pgvector
-      - kafka
+      neo4j:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+      pgvector:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     volumes:
       - ./backend:/app
       - uploads:/app/uploads

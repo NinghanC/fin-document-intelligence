@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+import asyncio
+import base64
 import json
 import re
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
+import structlog
 from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
 from config import settings
+
+logger = structlog.get_logger("finsight.model_clients")
 
 PLACEHOLDER_KEYS = {
     "",
@@ -25,25 +30,177 @@ PLACEHOLDER_KEYS = {
 
 
 def has_provider_key() -> bool:
+    provider = settings.model_provider.strip().lower()
+    if provider == "bedrock":
+        return bool(settings.bedrock_model_id.strip())
     return settings.openai_api_key.strip() not in PLACEHOLDER_KEYS
 
 
 def create_chat_model() -> Any:
-    """Return a provider-backed chat model, or the offline demo model.
-
-    The demo model exists only to keep local demos and deterministic CI usable
-    without provider credentials. It is not a substitute for live LLM
-    validation; see the optional live_llm tests.
-    """
+    """Return a resilient provider-backed chat model, or the offline demo model."""
+    fallback = DemoChatModel()
+    provider = settings.model_provider.strip().lower()
+    if provider == "bedrock" and has_provider_key():
+        return ResilientChatModel(BedrockChatModel(), fallback=fallback)
     if has_provider_key():
-        return ChatOpenAI(
+        provider_model = ChatOpenAI(
             model=settings.openai_model,
             api_key=SecretStr(settings.openai_api_key),
             base_url=settings.openai_base_url,
             temperature=0,
+            timeout=settings.model_call_timeout_seconds,
         )
-    return DemoChatModel()
+        return ResilientChatModel(provider_model, fallback=fallback)
+    return fallback
 
+
+
+
+@dataclass
+class ResilientChatModel:
+    """Adds timeout, retry, and optional demo fallback around chat models."""
+
+    primary: Any
+    fallback: Any | None = None
+
+    async def ainvoke(self, messages: list[Any]) -> AIMessage:
+        attempts = max(int(settings.model_call_max_retries), 0) + 1
+        last_error: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return await asyncio.wait_for(
+                    self.primary.ainvoke(messages),
+                    timeout=settings.model_call_timeout_seconds,
+                )
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    "model_call_failed",
+                    attempt=attempt,
+                    attempts=attempts,
+                    provider=settings.model_provider,
+                    error=str(exc),
+                )
+                if attempt < attempts:
+                    await asyncio.sleep(min(0.25 * attempt, 1.0))
+
+        if settings.model_call_fallback_to_demo and self.fallback is not None:
+            logger.warning("model_call_falling_back_to_demo", provider=settings.model_provider)
+            return await self.fallback.ainvoke(messages)
+        assert last_error is not None
+        raise last_error
+
+@dataclass
+class BedrockChatModel:
+    """Async wrapper around Amazon Bedrock Runtime Converse API."""
+
+    model_id: str | None = None
+
+    def __post_init__(self) -> None:
+        self.model_id = self.model_id or settings.bedrock_model_id
+        if not self.model_id:
+            raise RuntimeError("BEDROCK_MODEL_ID must be configured for MODEL_PROVIDER=bedrock")
+        try:
+            import boto3
+        except ImportError as exc:  # pragma: no cover - exercised only when optional dependency is missing
+            raise RuntimeError("boto3 is required for MODEL_PROVIDER=bedrock") from exc
+
+        session_kwargs: dict[str, str] = {}
+        if settings.aws_profile.strip():
+            session_kwargs["profile_name"] = settings.aws_profile.strip()
+        session = boto3.Session(**session_kwargs)
+        self.client = session.client("bedrock-runtime", region_name=settings.aws_region)
+
+    async def ainvoke(self, messages: list[Any]) -> AIMessage:
+        response = await asyncio.to_thread(self._converse, messages)
+        return AIMessage(content=self._extract_text(response))
+
+    def _converse(self, messages: list[Any]) -> dict[str, Any]:
+        system_blocks, conversation = self._convert_messages(messages)
+        payload: dict[str, Any] = {
+            "modelId": self.model_id,
+            "messages": conversation,
+            "inferenceConfig": {
+                "temperature": 0,
+                "maxTokens": settings.bedrock_max_tokens,
+            },
+        }
+        if system_blocks:
+            payload["system"] = system_blocks
+        return self.client.converse(**payload)
+
+    @classmethod
+    def _convert_messages(cls, messages: list[Any]) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+        system_blocks: list[dict[str, str]] = []
+        conversation: list[dict[str, Any]] = []
+        for message in messages:
+            message_type = getattr(message, "type", "human")
+            content = getattr(message, "content", message)
+            if message_type == "system":
+                system_blocks.extend(cls._text_blocks(content))
+                continue
+            role = "assistant" if message_type in {"ai", "assistant"} else "user"
+            blocks = cls._content_blocks(content)
+            if blocks:
+                conversation.append({"role": role, "content": blocks})
+        if not conversation:
+            conversation.append({"role": "user", "content": [{"text": ""}]})
+        return system_blocks, conversation
+
+    @classmethod
+    def _text_blocks(cls, content: Any) -> list[dict[str, str]]:
+        text = cls._string_content(content).strip()
+        return [{"text": text}] if text else []
+
+    @classmethod
+    def _content_blocks(cls, content: Any) -> list[dict[str, Any]]:
+        if isinstance(content, list):
+            blocks: list[dict[str, Any]] = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    blocks.append({"text": str(item.get("text", ""))})
+                    continue
+                if isinstance(item, dict) and item.get("type") == "image_url":
+                    image_block = cls._image_block(item)
+                    if image_block:
+                        blocks.append(image_block)
+                    continue
+                blocks.append({"text": cls._string_content(item)})
+            return blocks
+        return [{"text": cls._string_content(content)}]
+
+    @staticmethod
+    def _image_block(item: dict[str, Any]) -> dict[str, Any] | None:
+        image_url = item.get("image_url", {})
+        url = image_url.get("url") if isinstance(image_url, dict) else image_url
+        if not isinstance(url, str) or not url.startswith("data:image/"):
+            return None
+        header, encoded = url.split(",", 1)
+        image_format = header.split("/", 1)[1].split(";", 1)[0].lower()
+        if image_format == "jpg":
+            image_format = "jpeg"
+        return {
+            "image": {
+                "format": image_format,
+                "source": {"bytes": base64.b64decode(encoded)},
+            }
+        }
+
+    @staticmethod
+    def _string_content(content: Any) -> str:
+        if isinstance(content, list):
+            return " ".join(BedrockChatModel._string_content(item) for item in content)
+        if isinstance(content, dict):
+            if "text" in content:
+                return str(content["text"])
+            return json.dumps(content, ensure_ascii=False)
+        return str(content)
+
+    @staticmethod
+    def _extract_text(response: dict[str, Any]) -> str:
+        blocks = response.get("output", {}).get("message", {}).get("content", [])
+        parts = [str(block.get("text", "")) for block in blocks if isinstance(block, dict) and "text" in block]
+        return "\n".join(part for part in parts if part).strip()
 
 @dataclass
 class DemoChatModel:

@@ -7,9 +7,17 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # LLM
+    model_provider: str = "openai_compatible"  # openai_compatible | bedrock
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o"
+    aws_region: str = "us-east-1"
+    aws_profile: str = ""
+    bedrock_model_id: str = ""
+    bedrock_max_tokens: int = 2048
+    model_call_timeout_seconds: float = 45.0
+    model_call_max_retries: int = 2
+    model_call_fallback_to_demo: bool = True
     embedding_model: str = "text-embedding-3-small"
     embedding_provider: str = "auto"  # auto | openai | local | hash
     community_summary_provider: str = "structured"  # structured | llm

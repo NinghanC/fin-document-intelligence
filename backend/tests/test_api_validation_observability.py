@@ -184,3 +184,112 @@ def test_admin_stats_includes_api_metrics(monkeypatch):
     assert "ingestion" in response.json()
     assert "dead_letters" in response.json()["ingestion"]
     assert response.json()["api"]["total_requests"] >= 1
+
+@pytest.mark.asyncio
+async def test_api_state_store_sqlite_persists_rate_limits_and_metrics(tmp_path):
+    dsn = f"sqlite:///{tmp_path / 'api_state.sqlite'}"
+    metrics = {"total_requests": 0, "total_latency_ms": 0.0, "by_path": {}}
+    store = APIStateStore(
+        backend="postgres",
+        dsn=dsn,
+        rate_limit_buckets={},
+        request_metrics=metrics,
+    )
+
+    await store.init()
+    try:
+        assert await store.allow_request("client", limit=1, window_seconds=60) is True
+        assert await store.allow_request("client", limit=1, window_seconds=60) is False
+
+        await store.record_request_metric("/api/qa/ask", 10.0)
+        await store.record_request_metric("/api/qa/ask", 30.0)
+        stats = await store.get_request_stats()
+    finally:
+        await store.close()
+
+    assert stats["total_requests"] == 2
+    assert stats["avg_latency_ms"] == 20.0
+    assert stats["by_path"]["/api/qa/ask"]["count"] == 2
+    assert stats["by_path"]["/api/qa/ask"]["avg_latency_ms"] == 20.0
+
+
+@pytest.mark.asyncio
+async def test_api_state_store_falls_back_to_memory_when_postgres_unavailable():
+    metrics = {"total_requests": 0, "total_latency_ms": 0.0, "by_path": {}}
+    store = APIStateStore(
+        backend="postgres",
+        dsn="postgresql://invalid:invalid@127.0.0.1:1/missing",
+        rate_limit_buckets={},
+        request_metrics=metrics,
+    )
+
+    await store.init()
+
+    assert await store.allow_request("client", limit=1, window_seconds=60) is True
+    assert await store.allow_request("client", limit=1, window_seconds=60) is False
+
+    await store.record_request_metric("/api/health", 12.0)
+    stats = await store.get_request_stats()
+
+    assert stats["total_requests"] == 1
+    assert stats["by_path"]["/api/health"]["last_latency_ms"] == 12.0
+
+def test_dead_letter_admin_endpoints_list_retry_and_clear(tmp_path, monkeypatch):
+    source = tmp_path / "failed.txt"
+    source.write_text("Global Income Fund", encoding="utf-8")
+    monkeypatch.setattr("services.ingestion_registry.settings.upload_dir", str(tmp_path))
+    api_main.ingestion_registry._records = {}
+
+    skipped, _ = api_main.ingestion_registry.begin("failed-doc", str(source))
+    api_main.ingestion_registry.fail("failed-doc", "vector store unavailable")
+    assert skipped is False
+
+    class Workflow:
+        async def ainvoke(self, state):
+            return {
+                "chunks": [],
+                "extractions": [],
+                "skipped": False,
+            }
+
+    async def skip_init(init_fn, attempts=10, delay=2.0):
+        return True
+
+    monkeypatch.setattr(api_main, "_init_with_retry", skip_init)
+    api_main.workflows["ingest"] = Workflow()
+
+    with TestClient(api_main.app) as client:
+        listed = client.get("/api/admin/ingestion/dead-letters")
+        retried = client.post("/api/admin/ingestion/dead-letters/failed-doc/retry")
+        cleared = client.delete("/api/admin/ingestion/dead-letters/failed-doc")
+        listed_after_clear = client.get("/api/admin/ingestion/dead-letters")
+
+    assert listed.status_code == 200
+    assert listed.json()["dead_letters"][0]["doc_id"] == "failed-doc"
+    assert retried.status_code == 200
+    assert retried.json()["file_name"] == "failed.txt"
+    assert retried.json()["status"] == "success"
+    assert cleared.status_code == 200
+    assert listed_after_clear.json()["dead_letters"] == []
+
+
+def test_dead_letter_retry_returns_404_when_source_file_is_missing(tmp_path, monkeypatch):
+    source = tmp_path / "missing.txt"
+    source.write_text("Global Income Fund", encoding="utf-8")
+    monkeypatch.setattr("services.ingestion_registry.settings.upload_dir", str(tmp_path))
+    api_main.ingestion_registry._records = {}
+
+    api_main.ingestion_registry.begin("missing-doc", str(source))
+    api_main.ingestion_registry.fail("missing-doc", "parser failed")
+    source.unlink()
+
+    async def skip_init(init_fn, attempts=10, delay=2.0):
+        return True
+
+    monkeypatch.setattr(api_main, "_init_with_retry", skip_init)
+
+    with TestClient(api_main.app) as client:
+        response = client.post("/api/admin/ingestion/dead-letters/missing-doc/retry")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Source file is no longer available"

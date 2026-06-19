@@ -103,6 +103,7 @@ async def lifespan(app: FastAPI):
     yield
     for task in background_tasks:
         task.cancel()
+    await api_state_store.close()
     await knowledge_graph.close()
 
 
@@ -229,6 +230,7 @@ class IngestResponse(BaseModel):
     entities_count: int
     relations_count: int
     status: str
+    error: str | None = None
 
 
 class StatsResponse(BaseModel):
@@ -340,7 +342,27 @@ async def upload_batch(files: list[UploadFile] = File(...)):
 
     async def _upload_one(file: UploadFile) -> IngestResponse:
         async with semaphore:
-            return await upload_document(file)
+            try:
+                return await upload_document(file)
+            except HTTPException as exc:
+                return IngestResponse(
+                    file_name=Path(file.filename or "unknown").name,
+                    chunks_count=0,
+                    entities_count=0,
+                    relations_count=0,
+                    status="failed",
+                    error=str(exc.detail),
+                )
+            except Exception as exc:
+                logger.warning("batch_upload_file_failed", file_name=file.filename, error=str(exc))
+                return IngestResponse(
+                    file_name=Path(file.filename or "unknown").name,
+                    chunks_count=0,
+                    entities_count=0,
+                    relations_count=0,
+                    status="failed",
+                    error="Ingestion failed",
+                )
 
     return await asyncio.gather(*(_upload_one(file) for file in files))
 
@@ -398,6 +420,48 @@ async def get_stats():
         ingestion={"dead_letters": ingestion_registry.dead_letters()},
     )
 
+
+@app.get("/api/admin/ingestion/dead-letters", tags=["System Administration"], dependencies=[Depends(require_api_key)])
+async def list_dead_letters():
+    """List failed ingestion records that can be retried or cleared."""
+    return {"dead_letters": ingestion_registry.dead_letters()}
+
+
+@app.post("/api/admin/ingestion/dead-letters/{doc_id}/retry", response_model=IngestResponse, tags=["System Administration"], dependencies=[Depends(require_api_key)])
+async def retry_dead_letter(doc_id: str):
+    """Retry a failed ingestion record by document id."""
+    dead_letter = ingestion_registry.dead_letter(doc_id)
+    if dead_letter is None:
+        raise HTTPException(status_code=404, detail="Dead letter not found")
+
+    source = dead_letter.get("source", "")
+    if not source or not os.path.exists(source):
+        raise HTTPException(status_code=404, detail="Source file is no longer available")
+
+    ingest_wf = workflows.get("ingest")
+    if not ingest_wf:
+        raise HTTPException(status_code=503, detail="Ingest workflow not initialized")
+
+    result = await ingest_wf.ainvoke({"file_paths": [source]})
+    chunks = result.get("chunks", [])
+    extractions = result.get("extractions", [])
+    skipped = bool(result.get("skipped", False))
+    return IngestResponse(
+        file_name=Path(source).name,
+        chunks_count=len(chunks),
+        entities_count=sum(len(e.entities) for e in extractions),
+        relations_count=sum(len(e.relations) for e in extractions),
+        status="skipped" if skipped else "success",
+    )
+
+
+@app.delete("/api/admin/ingestion/dead-letters/{doc_id}", tags=["System Administration"], dependencies=[Depends(require_api_key)])
+async def clear_dead_letter(doc_id: str):
+    """Remove a failed ingestion record after operator review."""
+    cleared = ingestion_registry.clear_dead_letter(doc_id)
+    if not cleared:
+        raise HTTPException(status_code=404, detail="Dead letter not found")
+    return {"cleared": True, "doc_id": doc_id}
 
 @app.post("/api/admin/update", response_model=UpdateResponse, tags=["System Administration"], dependencies=[Depends(require_api_key)])
 async def trigger_update(req: UpdateRequest):

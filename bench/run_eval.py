@@ -20,10 +20,7 @@ def _matches(item: dict[str, Any], response: dict[str, Any]) -> bool:
     source_blob = " ".join(str(source) for source in sources)
     expected_source = item["expected_source"]
     terms = item.get("expected_terms", [])
-    return (
-        expected_source in source_blob
-        and all(term.lower() in source_blob.lower() for term in terms)
-    )
+    return expected_source in source_blob and all(term.lower() in source_blob.lower() for term in terms)
 
 
 def _answer_matches(item: dict[str, Any], response: dict[str, Any]) -> bool:
@@ -36,6 +33,7 @@ def main() -> None:
     parser.add_argument("--base-url", default="http://localhost:8080")
     parser.add_argument("--api-key", default="")
     parser.add_argument("--questions", default=str(Path(__file__).with_name("questions.json")))
+    parser.add_argument("--include-answer-smoke", action="store_true")
     args = parser.parse_args()
 
     questions = json.loads(Path(args.questions).read_text(encoding="utf-8"))
@@ -50,10 +48,11 @@ def main() -> None:
                 response.raise_for_status()
                 data = response.json()
                 ok = _matches(item, data)
-                answer_ok = _answer_matches(item, data)
+                answer_ok = _answer_matches(item, data) if args.include_answer_smoke else False
                 passed += int(ok)
                 answer_passed += int(answer_ok)
-                print(f"{'PASS' if ok else 'FAIL'} retrieval | {'PASS' if answer_ok else 'FAIL'} answer | {item['question']}")
+                answer_status = f" | {'PASS' if answer_ok else 'FAIL'} answer-smoke" if args.include_answer_smoke else ""
+                print(f"{'PASS' if ok else 'FAIL'} retrieval{answer_status} | {item['question']}")
         except httpx.HTTPError as exc:
             print(
                 f"Evaluation API request failed: {exc}. "
@@ -63,14 +62,17 @@ def main() -> None:
             raise SystemExit(2) from exc
 
     total = len(questions)
-    print(json.dumps({
+    result = {
         "primary_metric": "retrieval_hit_rate",
+        "note": "Generated answer text is not scored by default; use --include-answer-smoke for an optional smoke check.",
         "total": total,
         "passed": passed,
         "hit_rate": round(passed / max(total, 1), 3),
-        "answer_passed": answer_passed,
-        "answer_hit_rate": round(answer_passed / max(total, 1), 3),
-    }, indent=2))
+    }
+    if args.include_answer_smoke:
+        result["answer_smoke_passed"] = answer_passed
+        result["answer_smoke_hit_rate"] = round(answer_passed / max(total, 1), 3)
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

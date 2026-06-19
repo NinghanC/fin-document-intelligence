@@ -113,6 +113,30 @@ class IngestionRegistry:
                 if record.get("status") == "failed"
             ]
 
+
+    def clear_dead_letter(self, doc_id: str) -> bool:
+        with self._lock:
+            records = self._load()
+            record = records.get(doc_id)
+            if record is None or record.get("status") != "failed":
+                return False
+            del records[doc_id]
+            self._save(records)
+            return True
+
+    def dead_letter(self, doc_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            record = self._load().get(doc_id)
+            if record is None or record.get("status") != "failed":
+                return None
+            return {
+                "doc_id": doc_id,
+                "source": record.get("source", ""),
+                "content_hash": record.get("content_hash", ""),
+                "error": record.get("error", ""),
+                "retry_count": int(record.get("retry_count", 0)),
+                "failed_at": record.get("failed_at"),
+            }
     @staticmethod
     def compute_hash(path: str) -> str:
         digest = hashlib.sha256()

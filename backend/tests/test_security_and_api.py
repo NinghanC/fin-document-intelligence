@@ -250,3 +250,44 @@ async def test_upload_batch_uses_bounded_concurrency(monkeypatch):
     assert len(results) == 4
     assert max_active == 2
     assert elapsed < 0.16
+
+@pytest.mark.asyncio
+async def test_upload_batch_returns_per_file_failure_for_http_errors(monkeypatch):
+    async def fake_upload(file):
+        if file.filename == "bad.pdf":
+            raise HTTPException(status_code=400, detail="Invalid PDF signature")
+        return api_main.IngestResponse(
+            file_name=file.filename,
+            chunks_count=1,
+            entities_count=0,
+            relations_count=0,
+            status="success",
+        )
+
+    monkeypatch.setattr(api_main.settings, "batch_upload_concurrency", 2)
+    monkeypatch.setattr(api_main, "upload_document", fake_upload)
+
+    results = await api_main.upload_batch([
+        make_upload("good.txt", b"Global Income Fund"),
+        make_upload("bad.pdf", b"not a pdf"),
+    ])
+
+    assert [result.status for result in results] == ["success", "failed"]
+    assert results[1].file_name == "bad.pdf"
+    assert results[1].error == "Invalid PDF signature"
+
+
+@pytest.mark.asyncio
+async def test_upload_batch_returns_generic_failure_for_unexpected_errors(monkeypatch):
+    async def fake_upload(file):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(api_main.settings, "batch_upload_concurrency", 1)
+    monkeypatch.setattr(api_main, "upload_document", fake_upload)
+
+    results = await api_main.upload_batch([make_upload("fund.txt", b"Global Income Fund")])
+
+    assert len(results) == 1
+    assert results[0].status == "failed"
+    assert results[0].file_name == "fund.txt"
+    assert results[0].error == "Ingestion failed"

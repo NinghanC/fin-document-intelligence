@@ -1017,4 +1017,8 @@ def test_ingestion_registry_dead_letters_failed_records(tmp_path, monkeypatch):
     assert dead_letters[0]["doc_id"] == "failed-doc"
     assert dead_letters[0]["error"] == "vector store unavailable"
     assert dead_letters[0]["retry_count"] == 1
+    assert ingestion_registry.dead_letter("failed-doc")["doc_id"] == "failed-doc"
+    assert ingestion_registry.clear_dead_letter("failed-doc") is True
+    assert ingestion_registry.dead_letters() == []
+    assert ingestion_registry.clear_dead_letter("failed-doc") is False
 

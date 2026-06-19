@@ -475,10 +475,33 @@ Company -> belongs_to -> Sector <- belongs_to <- Company
 - path hit rate
 - average end-entity recall
 
-This complements the public-document API benchmark. The public filings test answer/source grounding; the synthetic metapath benchmark tests full graph-pattern coverage; the real-holdings benchmark tests whether those patterns work on a public-finance data shape.
+This complements the public-document API benchmark. The public filings test source and evidence retrieval only; the synthetic metapath benchmark tests full graph-pattern coverage; the real-holdings benchmark tests whether those patterns work on a public-finance data shape.
 
-For the public-document API benchmark, the primary metric is retrieval hit rate: expected source plus expected evidence terms must appear in returned source snippets. Answer-term matching is reported separately as an answer smoke metric. This avoids circularly tuning the benchmark to the deterministic demo answer model.
+For the public-document API benchmark, the metric is retrieval hit rate: expected source plus expected evidence terms must appear in returned source snippets. Generated answer text is not scored by default because the local demo model is deterministic and should not be treated as intelligence evaluation. `--include-answer-smoke` exists only as an optional formatting smoke check.
 
+#### Optional Live Provider Evaluation
+
+The deterministic benchmarks above are intentionally retrieval-focused. They verify that expected sources, evidence terms, metapaths, and graph paths are reachable without relying on a live model. They do not prove answer quality from a real provider.
+
+For provider-backed answer evaluation, use `bench/run_live_eval.py` against a running API after the public demo documents have been ingested and the API is configured with a real chat model:
+
+```bash
+python bench/run_live_eval.py \
+  --base-url http://localhost:8080 \
+  --api-key replace-with-a-random-local-secret \
+  --output bench/live_eval/results.local.json
+```
+
+`bench/live_eval/questions.json` contains finance questions with expected source files, expected evidence terms, expected answer points, and insufficient-evidence cases. The runner reports:
+
+- pass rate
+- source hit rate
+- evidence hit rate
+- answer-point hit rate
+- insufficient-evidence hit rate
+- per-answer-type breakdown
+
+If the API is already configured with provider credentials but the local shell does not expose `OPENAI_API_KEY`, pass `--allow-demo` to skip the local environment guard. Do not report deterministic demo-model output as live provider evaluation; it is useful for wiring checks only.
 #### Optional Live LLM Smoke Tests
 
 Most automated tests use the deterministic demo model so CI can run without provider credentials. That proves orchestration, parsing, retrieval, graph traversal, and API behavior, but it does not prove a real LLM follows the prompts.
@@ -538,10 +561,10 @@ The response includes:
 
 Operational hardening in the public prototype:
 
-- Batch uploads are processed with bounded concurrency (`BATCH_UPLOAD_CONCURRENCY`) instead of a sequential loop.
+- Batch uploads are processed with bounded concurrency (`BATCH_UPLOAD_CONCURRENCY`) and return per-file success/failure results instead of failing the entire batch on one bad upload.
 - Retrieval, parsing, graph, and storage fallbacks emit structured warning logs instead of silently swallowing exceptions.
 - Local embedding worker failures fall back to deterministic hash embeddings with a warning, rather than writing all-zero vectors.
-- Rate-limit buckets and request metrics default to in-memory state for local demos, with an optional PostgreSQL-backed mode via `API_STATE_BACKEND=postgres` and `API_STATE_DSN`.
+- Rate-limit buckets and request metrics default to in-memory state for local demos, with PostgreSQL-backed persistence via `API_STATE_BACKEND=postgres` and `API_STATE_DSN`; API state degrades to memory if the persistent store is unavailable.
 - The QA LangGraph includes conditional routing: low-quality answers are retried once with stronger evidence focus, then converted into an insufficient-evidence response instead of pretending to answer.
 
 ### 6. Incremental Update
@@ -560,7 +583,7 @@ changes -> process -> conditional retry -> END
 - file hash comparison
 - batch processing
 - one retry pass through LangGraph
-- failed-ingestion dead-letter visibility in `/api/admin/stats`
+- failed-ingestion dead-letter visibility in `/api/admin/stats`, plus operator endpoints to list, retry, and clear failed ingestion records
 
 `CDCProcessor` also provides helpers for:
 
@@ -617,9 +640,17 @@ Important variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `OPENAI_API_KEY` | Provider API key |
+| `MODEL_PROVIDER` | `openai_compatible` or `bedrock` |
+| `OPENAI_API_KEY` | Provider API key for OpenAI-compatible providers |
 | `OPENAI_BASE_URL` | OpenAI-compatible provider endpoint |
-| `OPENAI_MODEL` | Chat model or deployment name |
+| `OPENAI_MODEL` | Chat model or deployment name for OpenAI-compatible providers |
+| `AWS_REGION` | AWS region for native Bedrock Runtime |
+| `AWS_PROFILE` | Optional named AWS profile for local Bedrock credentials |
+| `BEDROCK_MODEL_ID` | Native Bedrock model ID when `MODEL_PROVIDER=bedrock` |
+| `BEDROCK_MAX_TOKENS` | Bedrock response token budget |
+| `MODEL_CALL_TIMEOUT_SECONDS` | Per-call provider timeout |
+| `MODEL_CALL_MAX_RETRIES` | Provider retry count before fallback/failure |
+| `MODEL_CALL_FALLBACK_TO_DEMO` | Allow provider failures to fall back to deterministic demo model; use `false` in production |
 | `EMBEDDING_MODEL` | Embedding model name |
 | `EMBEDDING_PROVIDER` | `auto`, `openai`, `local`, or `hash`; `auto` uses provider embeddings when configured and demo-safe hash embeddings otherwise |
 | `COMMUNITY_SUMMARY_PROVIDER` | `structured` for deterministic offline summaries or `llm` for provider-backed summaries computed during graph refresh |
@@ -645,9 +676,24 @@ Important variables:
 The intended model-provider targets are:
 
 - Azure OpenAI
-- AWS Bedrock through an OpenAI-compatible gateway or adapter
+- AWS Bedrock through the native Bedrock Runtime adapter
 - Databricks Mosaic AI Model Serving
 
+Native Bedrock chat is enabled with:
+
+```env
+MODEL_PROVIDER=bedrock
+AWS_REGION=us-east-1
+AWS_PROFILE=optional-local-profile
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20240620-v1:0
+BEDROCK_MAX_TOKENS=2048
+EMBEDDING_PROVIDER=local
+MODEL_CALL_TIMEOUT_SECONDS=45
+MODEL_CALL_MAX_RETRIES=2
+MODEL_CALL_FALLBACK_TO_DEMO=false
+```
+
+The Bedrock adapter uses the AWS SDK credential chain, so credentials can come from `aws configure`, `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, SSO, or an IAM role in deployed environments. The current adapter covers chat and vision-capable Converse requests; embeddings should remain `local`, `hash`, or an OpenAI-compatible embedding provider until a Bedrock embedding adapter is added.
 ## Quick Start
 
 Copy the environment template:
@@ -671,7 +717,33 @@ BATCH_UPLOAD_CONCURRENCY=4
 
 Protected endpoints require the `X-API-Key` header when `AUTH_ENABLED=true`. For a throwaway localhost-only demo, you can explicitly set `AUTH_ENABLED=false`, but the application default is protected.
 
-When running with Docker Compose, use service hostnames:
+### Run With AWS Bedrock
+
+For native Bedrock chat, configure AWS credentials with `aws configure`, SSO, environment variables, or an IAM role, then set:
+
+```env
+MODEL_PROVIDER=bedrock
+AWS_REGION=us-east-1
+AWS_PROFILE=optional-local-profile
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20240620-v1:0
+BEDROCK_MAX_TOKENS=2048
+EMBEDDING_PROVIDER=local
+MODEL_CALL_TIMEOUT_SECONDS=45
+MODEL_CALL_MAX_RETRIES=2
+MODEL_CALL_FALLBACK_TO_DEMO=false
+AUTH_ENABLED=true
+API_KEY=replace-with-a-random-local-secret
+```
+
+Before running live tests, check the local setup without calling Bedrock:
+
+```bash
+python scripts/check_bedrock_config.py --env-file backend/.env
+```
+
+For a production-shaped template, see `backend/.env.production.example`.
+
+When running with Docker Compose, the API service overrides local hostnames with container-network service names and waits for core dependencies to become healthy before startup:
 
 ```env
 NEO4J_URI=bolt://neo4j:7687
@@ -681,6 +753,8 @@ PGVECTOR_DSN=postgresql://postgres:postgres@pgvector:5432/knowledge
 KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 API_PORT=8080
 ```
+
+Docker Compose includes health checks for Neo4j, PGVector, Kafka, and the API container. ChromaDB is started as a dependency and the backend still performs service-level initialization retries, so temporary startup ordering issues degrade cleanly.
 
 Start the stack:
 
@@ -720,6 +794,17 @@ The bundled PGVector service also uses local demo defaults:
 postgres / postgres
 ```
 
+## CI/CD
+
+GitHub Actions runs the same deterministic quality gate used locally on every push and pull request:
+
+```bash
+ruff check backend bench scripts
+mypy --config-file pyproject.toml backend
+pytest -q
+```
+
+The CI job disables local embedding subprocess startup and uses hash embeddings so it stays deterministic and does not require provider credentials. Optional `live_llm` and `live_infra` tests remain manual validation steps.
 ## Local Development
 
 You can also run the backend directly after installing dependencies:
@@ -770,7 +855,7 @@ Known gaps:
 
 - API-key authentication is available for protected deployments, but there is no role-based access control.
 - No tenant isolation.
-- No background job queue for ingestion; failed ingestions are exposed as dead letters for operator visibility.
+- No full background job queue for ingestion; failed ingestions are exposed as operator-manageable dead letters with list, retry, and clear endpoints.
 - No malware scanning or file sandboxing for uploads.
 - No full observability stack.
 - No formal audit log for regulated workflows.
@@ -792,7 +877,7 @@ Known gaps:
 - Move ingestion to background jobs.
 - Add upload validation, file size limits, and malware scanning hooks.
 - Add answer audit logs and source-document traceability.
-- Add retry, timeout, and fallback policies for model calls.
+- Harden model-call retry, timeout, and fallback policy for provider-specific production needs.
 
 ### Phase 3: Production Deployment
 

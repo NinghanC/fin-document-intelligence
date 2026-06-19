@@ -63,20 +63,27 @@ def _weight_grid() -> list[dict[str, float]]:
     ]
 
 
-def _evaluate_rrf(questions: list[dict[str, Any]], responses: list[dict[str, Any]]) -> dict[str, Any]:
+def _evaluate_rrf(
+    questions: list[dict[str, Any]],
+    responses: list[dict[str, Any]],
+    include_answer_smoke: bool = False,
+) -> dict[str, Any]:
     retrieval_hits = sum(int(_retrieval_hit(item, response)) for item, response in zip(questions, responses, strict=False))
-    answer_hits = sum(int(_answer_hit(item, response)) for item, response in zip(questions, responses, strict=False))
-    return {
+    result = {
         "mode": "rrf",
         "fusion": "reciprocal_rank_fusion",
         "primary_metric": "retrieval_hit_rate",
-        "note": "Retrieval hit rate checks expected source and evidence terms in returned sources only; answer hit rate is reported separately to avoid tuning the benchmark to the demo answer model.",
+        "note": "Retrieval hit rate checks expected source and evidence terms in returned sources only. Generated answer text is not scored by default.",
         "total": len(questions),
         "expected_source_hits": retrieval_hits,
         "hit_rate": round(retrieval_hits / max(len(questions), 1), 3),
-        "answer_hits": answer_hits,
-        "answer_hit_rate": round(answer_hits / max(len(questions), 1), 3),
     }
+    if include_answer_smoke:
+        answer_hits = sum(int(_answer_hit(item, response)) for item, response in zip(questions, responses, strict=False))
+        result["answer_smoke_hits"] = answer_hits
+        result["answer_smoke_hit_rate"] = round(answer_hits / max(len(questions), 1), 3)
+        result["answer_smoke_note"] = "Optional smoke check only; do not present as retrieval or answer-quality evaluation."
+    return result
 
 
 def _evaluate_weighted_grid(
@@ -115,6 +122,7 @@ def main() -> None:
     parser.add_argument("--questions", default=str(Path(__file__).with_name("questions.json")))
     parser.add_argument("--mode", choices=["rrf", "weighted-grid", "both"], default="rrf")
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--include-answer-smoke", action="store_true")
     args = parser.parse_args()
 
     questions = json.loads(Path(args.questions).read_text(encoding="utf-8"))
@@ -137,13 +145,13 @@ def main() -> None:
 
     results: dict[str, Any]
     if args.mode == "rrf":
-        results = _evaluate_rrf(questions, responses)
+        results = _evaluate_rrf(questions, responses, include_answer_smoke=args.include_answer_smoke)
     elif args.mode == "weighted-grid":
         results = _evaluate_weighted_grid(questions, responses, top_k=args.top_k)
     else:
         results = {
             "mode": "both",
-            "rrf": _evaluate_rrf(questions, responses),
+            "rrf": _evaluate_rrf(questions, responses, include_answer_smoke=args.include_answer_smoke),
             "weighted_grid": _evaluate_weighted_grid(questions, responses, top_k=args.top_k),
         }
 

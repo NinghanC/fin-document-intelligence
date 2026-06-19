@@ -6,6 +6,10 @@ import asyncio
 import time
 from typing import Any
 
+import structlog
+
+logger = structlog.get_logger("finsight.api_state")
+
 
 class APIStateStore:
     def __init__(
@@ -25,21 +29,39 @@ class APIStateStore:
     async def init(self) -> None:
         if self.backend != "postgres":
             return
-        await asyncio.to_thread(self._init_postgres)
+        try:
+            await asyncio.to_thread(self._init_postgres)
+        except Exception as exc:
+            logger.warning("api_state_postgres_init_failed_using_memory", error=str(exc))
+            self._engine = None
+
+    async def close(self) -> None:
+        if self._engine is not None:
+            await asyncio.to_thread(self._engine.dispose)
+            self._engine = None
 
     async def allow_request(self, client: str, limit: int, window_seconds: int) -> bool:
         if self.backend == "postgres" and self._engine is not None:
-            return await asyncio.to_thread(self._allow_request_postgres, client, limit, window_seconds)
+            try:
+                return await asyncio.to_thread(self._allow_request_postgres, client, limit, window_seconds)
+            except Exception as exc:
+                logger.warning("api_state_postgres_rate_limit_failed_using_memory", error=str(exc))
         return self._allow_request_memory(client, limit, window_seconds)
 
     async def record_request_metric(self, path: str, duration_ms: float) -> None:
         self._record_request_metric_memory(path, duration_ms)
         if self.backend == "postgres" and self._engine is not None:
-            await asyncio.to_thread(self._record_request_metric_postgres, path, duration_ms)
+            try:
+                await asyncio.to_thread(self._record_request_metric_postgres, path, duration_ms)
+            except Exception as exc:
+                logger.warning("api_state_postgres_metric_write_failed", error=str(exc))
 
     async def get_request_stats(self) -> dict[str, Any]:
         if self.backend == "postgres" and self._engine is not None:
-            return await asyncio.to_thread(self._get_request_stats_postgres)
+            try:
+                return await asyncio.to_thread(self._get_request_stats_postgres)
+            except Exception as exc:
+                logger.warning("api_state_postgres_stats_failed_using_memory", error=str(exc))
         return self._request_stats_memory()
 
     def _allow_request_memory(self, client: str, limit: int, window_seconds: int) -> bool:
