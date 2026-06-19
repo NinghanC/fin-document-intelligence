@@ -208,11 +208,13 @@ class BedrockChatModel:
 
 @dataclass
 class DemoChatModel:
-    """Generic offline stub for local wiring tests only.
+    """Offline stub for local wiring tests and pipeline demos.
 
-    It deliberately avoids benchmark-specific financial knowledge, answer
-    extraction rules, and synthetic relationship generation. Configure a real
-    provider for any answer-quality or extraction-quality validation.
+    Knowledge extraction returns synthetic, domain-relevant entities and
+    relations (keyed off the document text) so demo ingestion exercises the
+    full graph pipeline. These are fixtures, not real extraction: answers and
+    summaries remain generic. Configure a real provider for any answer-quality
+    or extraction-quality validation.
     """
 
     async def ainvoke(self, messages: list[Any]) -> AIMessage:
@@ -282,17 +284,51 @@ class DemoChatModel:
         return "factoid"
 
     def _extract(self, user: str) -> dict[str, Any]:
+        """Return domain-relevant entities and relations so demo ingestion
+        exercises the full graph pipeline (metapath, community, inference).
+
+        These are synthetic fixtures keyed off the document text, not real
+        extraction. Confidence values clear the 0.7 quality gate in
+        KnowledgeExtractAgent._filter_extraction_result. Configure a real
+        provider for any extraction-quality validation.
+        """
         text = user.split("\n\n", 1)[-1]
-        entities = [
-            {
-                "name": name,
-                "type": "Concept",
-                "description": f"Entity mention detected by offline demo parser: {name}",
-                "confidence": 0.5,
-            }
-            for name in self._entities(text)
-        ]
-        return {"entities": entities, "relations": [], "events": []}
+        hint = text[:200].lower()
+
+        if "apple" in hint or "aapl" in hint:
+            entities = [
+                {"name": "Apple Inc", "type": "Company", "confidence": 0.92, "properties": {"ticker": "AAPL"}},
+                {"name": "Technology", "type": "Sector", "confidence": 0.88, "properties": {}},
+                {"name": "Foxconn", "type": "Supplier", "confidence": 0.85, "properties": {}},
+            ]
+            relations = [
+                {"head": "Apple Inc", "relation": "BELONGS_TO", "tail": "Technology", "confidence": 0.90, "properties": {}},
+                {"head": "Apple Inc", "relation": "DEPENDS_ON", "tail": "Foxconn", "confidence": 0.85, "properties": {}},
+            ]
+        elif "jpmorgan" in hint or "lcr" in hint:
+            entities = [
+                {"name": "JPMorgan Chase", "type": "Company", "confidence": 0.92, "properties": {"ticker": "JPM"}},
+                {"name": "Financial Services", "type": "Sector", "confidence": 0.88, "properties": {}},
+                {"name": "United States", "type": "Region", "confidence": 0.90, "properties": {}},
+            ]
+            relations = [
+                {"head": "JPMorgan Chase", "relation": "BELONGS_TO", "tail": "Financial Services", "confidence": 0.90, "properties": {}},
+                {"head": "JPMorgan Chase", "relation": "LOCATED_IN", "tail": "United States", "confidence": 0.88, "properties": {}},
+            ]
+        else:
+            entities = [
+                {"name": "Global Income Fund", "type": "Fund", "confidence": 0.88, "properties": {}},
+                {"name": "Sample Corp", "type": "Company", "confidence": 0.85, "properties": {"ticker": "SMPL"}},
+                {"name": "Technology", "type": "Sector", "confidence": 0.87, "properties": {}},
+            ]
+            relations = [
+                {"head": "Global Income Fund", "relation": "HOLDS", "tail": "Sample Corp", "confidence": 0.87, "properties": {}},
+                {"head": "Sample Corp", "relation": "BELONGS_TO", "tail": "Technology", "confidence": 0.85, "properties": {}},
+            ]
+
+        for entity in entities:
+            entity.setdefault("description", f"Synthetic demo entity: {entity['name']}")
+        return {"entities": entities, "relations": relations, "events": []}
 
     @staticmethod
     def _summarize(user: str) -> str:

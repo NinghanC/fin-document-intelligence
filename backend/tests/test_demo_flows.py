@@ -114,10 +114,17 @@ def test_demo_model_does_not_claim_answer_quality_without_context():
     assert "cannot answer without retrieved context" in answer.lower()
 
 
-def test_demo_model_extracts_no_synthetic_financial_relations():
+def test_demo_model_extracts_synthetic_relations_for_pipeline_demo():
     result = DemoChatModel()._extract("Global Income Fund monitors duration risk and liquidity buffer.")
 
-    assert result["relations"] == []
+    # Demo extraction now emits synthetic, domain-relevant entities and
+    # relations so demo ingestion exercises the full graph pipeline.
+    assert result["relations"], "demo extractor should emit synthetic relations"
+    entity_names = {e["name"] for e in result["entities"]}
+    for relation in result["relations"]:
+        assert relation["head"] in entity_names
+        assert relation["tail"] in entity_names
+        assert relation["confidence"] >= 0.7
 
 
 def test_demo_model_classifies_how_much_as_factoid():
@@ -203,15 +210,21 @@ async def test_cdc_processor_tracks_versions_and_diff():
 
 
 @pytest.mark.asyncio
-async def test_doc_parser_text_and_offline_extractor_do_not_fake_relations(tmp_path):
+async def test_doc_parser_text_and_offline_extractor_emit_synthetic_relations(tmp_path):
     report = tmp_path / "fund-report.txt"
     report.write_text("Global Income Fund monitors duration risk and liquidity buffer.", encoding="utf-8")
 
     chunks = await DocParserAgent().parse(str(report))
-    extraction = await KnowledgeExtractAgent().extract(chunks)
+    # Force the offline demo model so this exercises the offline path
+    # deterministically, regardless of whether a provider key is configured.
+    agent = KnowledgeExtractAgent()
+    agent.llm = DemoChatModel()
+    extraction = await agent.extract(chunks)
 
     assert chunks[0].doc_type == DocType.TEXT
-    assert all(not item.relations for item in extraction)
+    # Synthetic demo relations survive the 0.7 quality gate so the graph
+    # pipeline (metapath, community) has edges to traverse offline.
+    assert any(item.relations for item in extraction)
 
 
 @pytest.mark.asyncio
