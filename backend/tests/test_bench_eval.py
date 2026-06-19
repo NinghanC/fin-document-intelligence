@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 def load_graphrag_eval_module():
     module_path = Path(__file__).resolve().parents[2] / "bench" / "run_graphrag_eval.py"
@@ -44,6 +46,24 @@ def load_metapath_training_export_module():
 
 
 
+def load_han_attention_module():
+    module_path = Path(__file__).resolve().parents[2] / "bench" / "train_han_attention.py"
+    spec = importlib.util.spec_from_file_location("train_han_attention", module_path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_han_torch_module():
+    module_path = Path(__file__).resolve().parents[2] / "bench" / "train_han_torch.py"
+    spec = importlib.util.spec_from_file_location("train_han_torch", module_path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 def load_han_readiness_module():
     module_path = Path(__file__).resolve().parents[2] / "bench" / "han_readiness_report.py"
     spec = importlib.util.spec_from_file_location("han_readiness_report", module_path)
@@ -286,6 +306,84 @@ def test_han_export_builds_graph_artifacts(tmp_path):
     assert artifacts["adjacency_by_metapath"]["sector_exposure"]
     assert artifacts["adjacency_by_metapath"]["shared_sector"]
 
+def test_han_attention_baseline_uses_graph_artifacts(tmp_path):
+    export_module = load_metapath_training_export_module()
+    han_export_module = load_han_export_module()
+    attention_module = load_han_attention_module()
+    root = Path(__file__).resolve().parents[2]
+    synthetic = json.loads((root / "bench" / "metapath_dataset.json").read_text(encoding="utf-8"))
+    real_questions = json.loads((root / "bench" / "real_holdings" / "questions.json").read_text(encoding="utf-8"))
+    real_rows = export_module._read_csv(root / "bench" / "real_holdings" / "holdings_sample.csv")
+
+    records = export_module.build_training_records(synthetic, real_questions, real_rows)
+    training_path = tmp_path / "metapath_training.jsonl"
+    export_module.write_jsonl(records, training_path)
+    artifacts = han_export_module.build_han_artifacts(synthetic, real_rows, real_questions)
+    han_export_module.write_han_artifacts(artifacts, tmp_path)
+
+    train_records, eval_records = attention_module.ranker.split_records(
+        attention_module.ranker.load_jsonl(training_path),
+        "synthetic_finance_graph",
+        "real_13f_style_holdings",
+    )
+    han_context = attention_module.load_han_context(tmp_path)
+    weights = attention_module.train_attention_ranker(train_records, han_context, epochs=40, learning_rate=0.02)
+    result = attention_module.evaluate_attention_ranker(eval_records, weights, han_context)
+    weight_names = {item["feature"] for item in attention_module.top_weights(weights, limit=20)}
+
+    assert result["queries"] == len(real_questions)
+    assert result["attention_top1_hit_rate"] >= result["rule_top1_hit_rate"]
+    assert result["attention_mrr"] >= result["rule_mrr"]
+    assert "han_has_reachable_path" in weight_names or "han_log_path_instance_count" in weight_names
+
+
+def test_torch_han_ranker_uses_optional_pytorch_and_graph_artifacts(tmp_path):
+    pytest.importorskip("torch")
+    export_module = load_metapath_training_export_module()
+    han_export_module = load_han_export_module()
+    torch_module = load_han_torch_module()
+    root = Path(__file__).resolve().parents[2]
+    synthetic = json.loads((root / "bench" / "metapath_dataset.json").read_text(encoding="utf-8"))
+    real_questions = json.loads((root / "bench" / "real_holdings" / "questions.json").read_text(encoding="utf-8"))
+    real_rows = export_module._read_csv(root / "bench" / "real_holdings" / "holdings_sample.csv")
+
+    records = export_module.build_training_records(synthetic, real_questions, real_rows)
+    training_path = tmp_path / "metapath_training.jsonl"
+    export_module.write_jsonl(records, training_path)
+    artifacts = han_export_module.build_han_artifacts(synthetic, real_rows, real_questions)
+    han_export_module.write_han_artifacts(artifacts, tmp_path)
+
+    train_records, eval_records = torch_module.ranker.split_records(
+        torch_module.ranker.load_jsonl(training_path),
+        "synthetic_finance_graph",
+        "real_13f_style_holdings",
+    )
+    han_context = torch_module.han_baseline.load_han_context(tmp_path)
+    model, feature_names, metapath_ids = torch_module.train_torch_han_ranker(
+        train_records,
+        han_context,
+        epochs=60,
+        learning_rate=0.01,
+        hidden_dim=16,
+    )
+    result = torch_module.evaluate_torch_han_ranker(eval_records, model, han_context, feature_names, metapath_ids)
+    attention = torch_module.attention_summary(model)
+
+    assert result["queries"] == len(real_questions)
+    assert result["torch_top1_hit_rate"] >= result["rule_top1_hit_rate"]
+    assert result["torch_mrr"] >= result["rule_mrr"]
+    assert attention["mean_abs_attention_gate_weight"] > 0
+    assert attention["mean_metapath_embedding_norm"] > 0
+
+    report_path = tmp_path / "torch_han_eval.json"
+    model_path = tmp_path / "torch_han_model.pt"
+    torch_module.write_json(report_path, result)
+    torch_module.save_model_artifact(model_path, model, feature_names, metapath_ids, result, hidden_dim=16)
+
+    saved_report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert saved_report["torch_top1_hit_rate"] == result["torch_top1_hit_rate"]
+    assert model_path.exists()
+
 def test_han_readiness_report_blocks_small_labeled_sets(tmp_path):
     export_module = load_metapath_training_export_module()
     han_module = load_han_export_module()
@@ -301,8 +399,8 @@ def test_han_readiness_report_blocks_small_labeled_sets(tmp_path):
     artifacts = han_module.build_han_artifacts(synthetic, real_rows, real_questions)
     han_module.write_han_artifacts(artifacts, tmp_path)
 
-    conservative = readiness_module.build_report(training_path, tmp_path, min_queries=50, min_eval_queries=10)
-    relaxed = readiness_module.build_report(training_path, tmp_path, min_queries=20, min_eval_queries=8)
+    conservative = readiness_module.build_report(training_path, tmp_path, min_queries=80, min_eval_queries=20)
+    relaxed = readiness_module.build_report(training_path, tmp_path, min_queries=50, min_eval_queries=10)
 
     assert conservative["ready_for_han"] is False
     assert "minimum_labeled_queries" in conservative["blockers"]

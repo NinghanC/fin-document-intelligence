@@ -47,4 +47,28 @@
     "expected_metapath": "shared_sector",
     "expected_end_entities": ["Broadcom"]
   }
-]
+  ,
+  {
+    "question": "Which country exposure does Vanguard 13F Portfolio have in this holdings sample?",
+    "start_entities": ["Vanguard 13F Portfolio"],
+    "expected_metapath": "geographic_risk",
+    "expected_end_entities": ["United States"]
+  },
+  {
+    "question": "Which companies are in the same sector as JPMorgan Chase in the holdings sample?",
+    "start_entities": ["JPMorgan Chase"],
+    "expected_metapath": "shared_sector",
+    "expected_end_entities": ["Bank of America", "American Express", "Moody's", "Berkshire Hathaway"]
+  },
+  {
+    "question": "Which peers share the same sector as Meta Platforms?",
+    "start_entities": ["Meta Platforms"],
+    "expected_metapath": "shared_sector",
+    "expected_end_entities": ["Alphabet"]
+  },
+  {
+    "question": "Which sector exposure does Berkshire Hathaway 13F Portfolio show through holdings?",
+    "start_entities": ["Berkshire Hathaway 13F Portfolio"],
+    "expected_metapath": "sector_exposure",
+    "expected_end_entities": ["Technology", "Financials", "Consumer Staples", "Energy"]
+  }]

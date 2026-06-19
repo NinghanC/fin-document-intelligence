@@ -165,5 +165,209 @@
       "expected_metapath": "subsidiary_chain",
       "expected_end_entities": ["Merchant Services Europe"]
     }
-  ]
+    ,
+    {
+      "question": "Which sector is Defensive Credit Fund exposed to through its holdings?",
+      "start_entities": ["Defensive Credit Fund"],
+      "expected_metapath": "sector_exposure",
+      "expected_end_entities": ["Financials"]
+    },
+    {
+      "question": "What industry concentration does Global Income Fund have?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "sector_exposure",
+      "expected_end_entities": ["Technology", "Financials"]
+    },
+    {
+      "question": "Which industry exposure is present in Strategic Growth Fund?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "sector_exposure",
+      "expected_end_entities": ["Technology", "Semiconductors"]
+    },
+    {
+      "question": "Which sector concentration is visible for Defensive Credit Fund?",
+      "start_entities": ["Defensive Credit Fund"],
+      "expected_metapath": "sector_exposure",
+      "expected_end_entities": ["Financials"]
+    },
+    {
+      "question": "What geographic region does Defensive Credit Fund reach through holdings?",
+      "start_entities": ["Defensive Credit Fund"],
+      "expected_metapath": "geographic_risk",
+      "expected_end_entities": ["United States"]
+    },
+    {
+      "question": "Which region exposure does Global Income Fund have?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "geographic_risk",
+      "expected_end_entities": ["United States"]
+    },
+    {
+      "question": "Which country exposure does Strategic Growth Fund have?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "geographic_risk",
+      "expected_end_entities": ["United States", "Netherlands"]
+    },
+    {
+      "question": "Which location risk applies to Defensive Credit Fund holdings?",
+      "start_entities": ["Defensive Credit Fund"],
+      "expected_metapath": "geographic_risk",
+      "expected_end_entities": ["United States"]
+    },
+    {
+      "question": "Which supplier dependency is linked to Strategic Growth Fund?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "supply_chain_risk",
+      "expected_end_entities": ["Taiwan Semiconductor Manufacturing", "CloudOps Europe"]
+    },
+    {
+      "question": "Which vendor risk does Strategic Growth Fund inherit through companies?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "supply_chain_risk",
+      "expected_end_entities": ["Taiwan Semiconductor Manufacturing", "CloudOps Europe"]
+    },
+    {
+      "question": "What supply dependencies affect Global Income Fund?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "supply_chain_risk",
+      "expected_end_entities": ["CloudOps Europe"]
+    },
+    {
+      "question": "Which supplier exposure does Global Income Fund have?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "supply_chain_risk",
+      "expected_end_entities": ["CloudOps Europe"]
+    },
+    {
+      "question": "Which software technology is connected to Global Income Fund?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "technology_risk",
+      "expected_end_entities": ["Azure", "Core Banking Platform"]
+    },
+    {
+      "question": "Which platform dependencies affect Global Income Fund?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "technology_risk",
+      "expected_end_entities": ["Azure", "Core Banking Platform"]
+    },
+    {
+      "question": "Which technology platform does Strategic Growth Fund touch?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "technology_risk",
+      "expected_end_entities": ["GPU Acceleration"]
+    },
+    {
+      "question": "Which infrastructure exposure is linked to Strategic Growth Fund?",
+      "start_entities": ["Strategic Growth Fund"],
+      "expected_metapath": "technology_risk",
+      "expected_end_entities": ["GPU Acceleration"]
+    },
+    {
+      "question": "Which compliance obligations apply to Defensive Credit Fund?",
+      "start_entities": ["Defensive Credit Fund"],
+      "expected_metapath": "compliance_chain",
+      "expected_end_entities": ["Basel III", "SEC Liquidity Rule"]
+    },
+    {
+      "question": "What regulatory scope covers Defensive Credit Fund holdings?",
+      "start_entities": ["Defensive Credit Fund"],
+      "expected_metapath": "compliance_chain",
+      "expected_end_entities": ["Basel III", "SEC Liquidity Rule"]
+    },
+    {
+      "question": "Which regulatory rules apply to Global Income Fund holdings?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "compliance_chain",
+      "expected_end_entities": ["Basel III", "SEC Liquidity Rule"]
+    },
+    {
+      "question": "Which holdings are subject to compliance rules for Global Income Fund?",
+      "start_entities": ["Global Income Fund"],
+      "expected_metapath": "compliance_chain",
+      "expected_end_entities": ["Basel III", "SEC Liquidity Rule"]
+    },
+    {
+      "question": "Which company is in the same sector as Apple Inc.?",
+      "start_entities": ["Apple Inc."],
+      "expected_metapath": "shared_sector",
+      "expected_end_entities": ["Microsoft"]
+    },
+    {
+      "question": "Which similar companies share the sector with Microsoft?",
+      "start_entities": ["Microsoft"],
+      "expected_metapath": "shared_sector",
+      "expected_end_entities": ["Apple Inc."]
+    },
+    {
+      "question": "Which peers are in the same sector as Visa?",
+      "start_entities": ["Visa"],
+      "expected_metapath": "shared_sector",
+      "expected_end_entities": ["JPMorgan Chase"]
+    },
+    {
+      "question": "Which company is in the same sector as ASML?",
+      "start_entities": ["ASML"],
+      "expected_metapath": "shared_sector",
+      "expected_end_entities": ["Nvidia"]
+    },
+    {
+      "question": "Which semiconductor peers share sector exposure with Nvidia?",
+      "start_entities": ["Nvidia"],
+      "expected_metapath": "shared_sector",
+      "expected_end_entities": ["ASML"]
+    },
+    {
+      "question": "Which company has board overlap with Microsoft?",
+      "start_entities": ["Microsoft"],
+      "expected_metapath": "management_overlap",
+      "expected_end_entities": ["Apple Inc."]
+    },
+    {
+      "question": "Which company has executive overlap with Apple Inc.?",
+      "start_entities": ["Apple Inc."],
+      "expected_metapath": "management_overlap",
+      "expected_end_entities": ["Microsoft"]
+    },
+    {
+      "question": "Which company has management overlap with Visa?",
+      "start_entities": ["Visa"],
+      "expected_metapath": "management_overlap",
+      "expected_end_entities": ["JPMorgan Chase"]
+    },
+    {
+      "question": "Which company has director overlap with JPMorgan Chase?",
+      "start_entities": ["JPMorgan Chase"],
+      "expected_metapath": "management_overlap",
+      "expected_end_entities": ["Visa"]
+    },
+    {
+      "question": "Which downstream company appears in JPMorgan Chase ownership chain?",
+      "start_entities": ["JPMorgan Chase"],
+      "expected_metapath": "subsidiary_chain",
+      "expected_end_entities": ["Merchant Services Europe"]
+    },
+    {
+      "question": "What subsidiary chain is reachable from JPMorgan Chase?",
+      "start_entities": ["JPMorgan Chase"],
+      "expected_metapath": "subsidiary_chain",
+      "expected_end_entities": ["Merchant Services Europe"]
+    },
+    {
+      "question": "Which company is reached by the owns path from JPMorgan Chase?",
+      "start_entities": ["JPMorgan Chase"],
+      "expected_metapath": "subsidiary_chain",
+      "expected_end_entities": ["Merchant Services Europe"]
+    },
+    {
+      "question": "Which parent ownership path starts at JPMorgan Chase?",
+      "start_entities": ["JPMorgan Chase"],
+      "expected_metapath": "subsidiary_chain",
+      "expected_end_entities": ["Merchant Services Europe"]
+    },
+    {
+      "question": "Which multi-level owns relationship starts from JPMorgan Chase?",
+      "start_entities": ["JPMorgan Chase"],
+      "expected_metapath": "subsidiary_chain",
+      "expected_end_entities": ["Merchant Services Europe"]
+    }  ]
 }
