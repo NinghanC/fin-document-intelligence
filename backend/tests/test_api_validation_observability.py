@@ -34,8 +34,10 @@ def test_resolve_within_upload_dir_accepts_in_dir_path(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "evil",
     [
+        # Forward slashes are path separators on both POSIX and Windows, so these
+        # are traversal on every OS. A backslash payload is only meaningful on
+        # Windows (on POSIX it is a legal filename), so it is not portable here.
         "../../etc/passwd",
-        "..\\..\\windows\\system32\\config\\sam",
         "subdir/../../escape.txt",
     ],
 )

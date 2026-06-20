@@ -25,7 +25,13 @@
       "Bash(docker compose *)",
       "Bash(docker-compose version *)",
       "Bash(curl -s http://localhost:8080/api/admin/stats)",
-      "Bash(docker inspect *)"
+      "Bash(docker inspect *)",
+      "PowerShell(cd C:\\\\Git\\\\document-intelligence\\\\backend; $bt=\"C:\\\\Git\\\\document-intelligence\\\\.pytmp\"; $env:TMP=$bt; $env:TEMP=$bt; & \"C:\\\\Git\\\\document-intelligence\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest tests/test_api_validation_observability.py -p no:cacheprovider -q --basetemp=\"$bt\\\\pt\" -k \"resolve_within\" 2>&1 | Select-Object -Last 6; Remove-Item -Recurse -Force $bt -ErrorAction SilentlyContinue)",
+      "PowerShell(cd C:\\\\Git\\\\document-intelligence\\\\backend; $bt=\"C:\\\\Git\\\\document-intelligence\\\\.pytmp\"; New-Item -ItemType Directory -Force $bt | Out-Null; $env:TMP=$bt; $env:TEMP=$bt; & \"C:\\\\Git\\\\document-intelligence\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest tests/test_api_validation_observability.py -p no:cacheprovider -q --basetemp=\"$bt\\\\pt\" -k \"resolve_within\" 2>&1 | Select-Object -Last 6)",
+      "Bash(cd /c/Git/document-intelligence && rm -rf .pytmp && echo \"cleaned\")"
+    ],
+    "additionalDirectories": [
+      "c:\\c\\Git\\document-intelligence"
     ]
   }
 }
