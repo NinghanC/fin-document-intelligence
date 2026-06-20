@@ -104,6 +104,8 @@ class GraphRAGPipeline:
         self.alias_table = {**DEFAULT_ALIAS_TABLE, **(alias_table or {})}
         self.metapath_router = MetapathRouter()
         self.inference_engine = LogicalInferenceEngine()
+        self._entity_names_snapshot: list[str] | None = None
+        self._entity_embedding_cache: list[list[float]] | None = None
 
     async def retrieve(self, query: str, top_k: int = 10) -> list[GraphRAGContext]:
         """
@@ -484,12 +486,21 @@ class GraphRAGPipeline:
         name = get_value("name", None) if callable(get_value) else None
         return str(name) if name else None
 
+    async def _entity_embedding_index(self) -> tuple[list[str], list[list[float]]]:
+        names = sorted(await self.knowledge_graph.get_all_entity_names())
+        if names == self._entity_names_snapshot and self._entity_embedding_cache is not None:
+            return names, self._entity_embedding_cache
+        # ponytail: snapshot cache; replace with a real vector index when entity count makes this hot.
+        embeddings = await self.embeddings.aembed_documents(names) if names else []
+        self._entity_names_snapshot = names
+        self._entity_embedding_cache = embeddings
+        return names, embeddings
+
     async def _embedding_entity_match(self, mention: str, threshold: float = 0.8, limit: int = 3) -> list[str]:
-        names = await self.knowledge_graph.get_all_entity_names()
+        names, name_vectors = await self._entity_embedding_index()
         if not names:
             return []
         mention_vector = await self.embeddings.aembed_query(mention)
-        name_vectors = await self.embeddings.aembed_documents(names)
         scored = [
             (self._cosine_similarity(mention_vector, vector), name)
             for name, vector in zip(names, name_vectors, strict=False)

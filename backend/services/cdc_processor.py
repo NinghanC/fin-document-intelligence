@@ -212,9 +212,19 @@ class CDCProcessor:
         return results
 
     # Kafka Consumer
-    async def start_kafka_consumer(self, topics: list[str] | None = None) -> None:
-        """Start the Kafka CDC consumer loop"""
-        from confluent_kafka import Consumer
+    async def start_kafka_consumer(self, topics: list[str] | None = None, max_retries: int = 3) -> None:
+        """Start the Kafka CDC consumer loop.
+
+        Offsets are committed manually and only after an event is applied
+        successfully. The confluent-kafka default (``enable.auto.commit=True``)
+        advances offsets on a timer regardless of whether processing succeeded, so a
+        crash or downstream outage between poll and apply silently skips messages
+        (data loss). Here a failing event is retried up to ``max_retries`` times
+        before being logged as a dropped/dead-letter event and skipped, so a poison
+        message cannot block the partition forever while a healthy event is never
+        silently lost on restart.
+        """
+        from confluent_kafka import Consumer, KafkaError, KafkaException
 
         if topics is None:
             topics = [settings.kafka_topic_doc_changes]
@@ -223,23 +233,93 @@ class CDCProcessor:
             "bootstrap.servers": settings.kafka_bootstrap_servers,
             "group.id": "cdc-processor",
             "auto.offset.reset": "latest",
-            "enable.auto.commit": True,
+            "enable.auto.commit": False,
         }
         consumer = Consumer(conf)
         consumer.subscribe(topics)
+        retry_counts: dict[tuple[str, int, int], int] = {}
 
         try:
             while True:
                 msg = await asyncio.to_thread(consumer.poll, 1.0)
-                if msg is None or msg.error():
+                if msg is None:
                     continue
-                value = msg.value()
-                if value is None:
+                error = msg.error()
+                if error is not None:
+                    # _PARTITION_EOF is benign (caught up to the high-water mark);
+                    # anything else is logged, and fatal errors stop the consumer
+                    # rather than spinning invisibly on a broken connection.
+                    if error.code() == KafkaError._PARTITION_EOF:
+                        continue
+                    logger.error("cdc_kafka_consumer_error", code=error.code(), error=str(error))
+                    if error.fatal():
+                        raise KafkaException(error)
                     continue
-                event = self.from_kafka_message(value)
-                await self.process_event(event)
+                await self._consume_message(consumer, msg, retry_counts, max_retries)
         finally:
             consumer.close()
+
+    async def _consume_message(
+        self,
+        consumer: Any,
+        msg: Any,
+        retry_counts: dict[tuple[str, int, int], int],
+        max_retries: int,
+    ) -> str:
+        """Apply one polled Kafka message and manage its offset commit.
+
+        Returns the action taken ("empty" | "unparseable" | "committed" | "retry" |
+        "dropped"), which is the unit the consumer tests assert against.
+        """
+        from confluent_kafka import TopicPartition
+
+        key = (msg.topic(), msg.partition(), msg.offset())
+        value = msg.value()
+        if value is None:
+            await asyncio.to_thread(consumer.commit, msg, asynchronous=False)
+            retry_counts.pop(key, None)
+            return "empty"
+
+        try:
+            event = self.from_kafka_message(value)
+        except Exception as exc:
+            # A message that cannot be parsed will never succeed; commit past it so
+            # it does not block the partition, but surface it loudly.
+            logger.error("cdc_message_unparseable_dropped", offset=msg.offset(), error=str(exc))
+            await asyncio.to_thread(consumer.commit, msg, asynchronous=False)
+            retry_counts.pop(key, None)
+            return "unparseable"
+
+        result = await self.process_event(event)
+        if result.success:
+            await asyncio.to_thread(consumer.commit, msg, asynchronous=False)
+            retry_counts.pop(key, None)
+            return "committed"
+
+        attempts = retry_counts.get(key, 0) + 1
+        if attempts <= max_retries:
+            retry_counts[key] = attempts
+            logger.warning(
+                "cdc_event_apply_retry",
+                event_id=event.event_id,
+                attempt=attempts,
+                max_retries=max_retries,
+                error=result.error,
+            )
+            # Replay the same offset on the next poll instead of committing.
+            await asyncio.to_thread(consumer.seek, TopicPartition(msg.topic(), msg.partition(), msg.offset()))
+            await asyncio.sleep(min(0.5 * attempts, 2.0))
+            return "retry"
+
+        logger.error(
+            "cdc_event_dropped_after_retries",
+            event_id=event.event_id,
+            attempts=attempts,
+            error=result.error,
+        )
+        await asyncio.to_thread(consumer.commit, msg, asynchronous=False)
+        retry_counts.pop(key, None)
+        return "dropped"
 
     async def _apply_update(self, event: CDCEvent) -> Any | None:
         if self._update_handler is None:

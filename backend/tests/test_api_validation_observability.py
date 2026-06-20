@@ -23,6 +23,41 @@ def reset_api_state(monkeypatch):
     api_main._request_metrics["by_path"] = {}
 
 
+def test_resolve_within_upload_dir_accepts_in_dir_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_main.settings, "upload_dir", str(tmp_path))
+
+    resolved = api_main._resolve_within_upload_dir("report.pdf")
+
+    assert resolved == str((tmp_path / "report.pdf").resolve())
+
+
+@pytest.mark.parametrize(
+    "evil",
+    [
+        "../../etc/passwd",
+        "..\\..\\windows\\system32\\config\\sam",
+        "subdir/../../escape.txt",
+    ],
+)
+def test_resolve_within_upload_dir_rejects_traversal(tmp_path, monkeypatch, evil):
+    monkeypatch.setattr(api_main.settings, "upload_dir", str(tmp_path))
+
+    with pytest.raises(HTTPException) as exc:
+        api_main._resolve_within_upload_dir(evil)
+
+    assert exc.value.status_code == 400
+
+
+def test_resolve_within_upload_dir_rejects_absolute_outside_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_main.settings, "upload_dir", str(tmp_path))
+    outside = str(tmp_path.parent / "secret.env")
+
+    with pytest.raises(HTTPException) as exc:
+        api_main._resolve_within_upload_dir(outside)
+
+    assert exc.value.status_code == 400
+
+
 @pytest.mark.asyncio
 async def test_upload_rejects_unsupported_extension(tmp_path, monkeypatch):
     monkeypatch.setattr(api_main.settings, "upload_dir", str(tmp_path))

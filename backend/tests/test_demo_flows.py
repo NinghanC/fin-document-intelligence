@@ -3,7 +3,7 @@ import os
 import pytest
 
 from agents.doc_parser_agent import DocParserAgent, DocType
-from agents.knowledge_extract_agent import KnowledgeExtractAgent
+from agents.knowledge_extract_agent import Entity, ExtractionResult, KnowledgeExtractAgent, Relation
 from agents.qa_agent import QAAgent
 from services.cdc_processor import CDCProcessor
 from services.embedding_worker import get_embedding_client
@@ -121,10 +121,20 @@ def test_demo_model_extracts_synthetic_relations_for_pipeline_demo():
     # relations so demo ingestion exercises the full graph pipeline.
     assert result["relations"], "demo extractor should emit synthetic relations"
     entity_names = {e["name"] for e in result["entities"]}
+    assert all(entity["confidence"] >= 0.7 for entity in result["entities"])
     for relation in result["relations"]:
         assert relation["head"] in entity_names
         assert relation["tail"] in entity_names
         assert relation["confidence"] >= 0.7
+
+    filtered = KnowledgeExtractAgent._filter_extraction_result(ExtractionResult(
+        entities=[Entity(**entity) for entity in result["entities"]],
+        relations=[Relation(**relation) for relation in result["relations"]],
+        events=[],
+        source_chunk_id="demo",
+    ))
+    assert filtered.entities
+    assert filtered.relations
 
 
 def test_demo_model_classifies_how_much_as_factoid():

@@ -115,6 +115,32 @@ async def test_resilient_chat_model_raises_when_fallback_disabled(monkeypatch):
     with pytest.raises(RuntimeError, match="provider unavailable"):
         await model.ainvoke([HumanMessage(content="hello")])
 
+@pytest.mark.asyncio
+async def test_resilient_chat_model_raises_fatal_error_without_retry_or_demo(monkeypatch):
+    monkeypatch.setattr(model_clients.settings, "model_call_max_retries", 3)
+    monkeypatch.setattr(model_clients.settings, "model_call_timeout_seconds", 1.0)
+    monkeypatch.setattr(model_clients.settings, "model_call_fallback_to_demo", True)
+
+    class BadKeyError(Exception):
+        status_code = 401
+
+    class FatalModel:
+        def __init__(self):
+            self.calls = 0
+
+        async def ainvoke(self, messages):
+            self.calls += 1
+            raise BadKeyError("invalid api key")
+
+    primary = FatalModel()
+    model = ResilientChatModel(primary, fallback=DemoChatModel())
+
+    with pytest.raises(BadKeyError):
+        await model.ainvoke([HumanMessage(content="hello")])
+    # fatal errors are not retried and never masked by the demo fallback
+    assert primary.calls == 1
+
+
 def test_bedrock_session_ignores_empty_aws_profile_env(monkeypatch):
     created_sessions = []
 

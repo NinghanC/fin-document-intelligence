@@ -441,6 +441,10 @@ class KnowledgeGraphService:
             and rel.get("head") not in memory_deleted
             and rel.get("tail") not in memory_deleted
         ]
+        # Mirror the deletion into the SQLite fallback; otherwise deleted entities
+        # and relations are only removed from memory (and Neo4j) and resurrect from
+        # the persisted store on the next restart. No-ops when persistence is off.
+        self._delete_fallback_by_source(source_prefixes)
         await self.refresh_community_summaries()
         if not self._driver:
             return len(memory_deleted)

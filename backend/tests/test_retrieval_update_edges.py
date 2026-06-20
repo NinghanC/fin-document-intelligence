@@ -122,6 +122,26 @@ async def test_persistent_graph_fallback_survives_service_restart(tmp_path, monk
     assert stats["total_relations"] == 1
     assert neighbors[0]["target"] == "Microsoft"
 
+
+@pytest.mark.asyncio
+async def test_persistent_graph_fallback_delete_survives_service_restart(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.knowledge_graph.settings.upload_dir", str(tmp_path))
+    first = KnowledgeGraphService(persist_fallback=True)
+    await first.upsert_entity(Entity("Global Income Fund", "Fund"), source="fund.pdf")
+    await first.upsert_entity(Entity("Microsoft", "Company"), source="fund.pdf")
+    await first.add_relation(Relation("Global Income Fund", "holds", "Microsoft"), source="fund.pdf")
+
+    deleted = await first.delete_by_source("fund.pdf")
+    assert deleted == 2
+
+    # A restart must not resurrect data that was deleted: the deletion has to be
+    # mirrored into the SQLite fallback, not just the in-memory graph.
+    restarted = KnowledgeGraphService(persist_fallback=True)
+    stats = await restarted.get_stats()
+
+    assert stats["total_entities"] == 0
+    assert stats["total_relations"] == 0
+
 async def test_graphrag_metapath_search_adds_explainable_context():
     class VectorStore:
         async def search(self, query, top_k=5):
@@ -469,6 +489,37 @@ def test_extraction_filter_keeps_single_normal_confidence_entity():
 
 
 @pytest.mark.asyncio
+async def test_embedding_entity_match_caches_entity_name_embeddings():
+    class Graph:
+        async def get_all_entity_names(self, limit=1000):
+            return ["Duration Risk", "Liquidity Buffer"]
+
+    class CountingEmbeddings:
+        def __init__(self):
+            self.document_calls = 0
+            self.query_calls = 0
+
+        async def aembed_query(self, text):
+            self.query_calls += 1
+            return [1.0, 0.0] if "duration" in text.lower() else [0.0, 1.0]
+
+        async def aembed_documents(self, texts):
+            self.document_calls += 1
+            return [[1.0, 0.0] if "duration" in text.lower() else [0.0, 1.0] for text in texts]
+
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return []
+
+    pipeline = GraphRAGPipeline(VectorStore(), Graph())
+    embeddings = CountingEmbeddings()
+    pipeline.embeddings = embeddings
+
+    assert await pipeline._embedding_entity_match("duration sensitivity") == ["Duration Risk"]
+    assert await pipeline._embedding_entity_match("duration exposure") == ["Duration Risk"]
+    assert embeddings.document_calls == 1
+    assert embeddings.query_calls == 2
+
 async def test_entity_resolution_embedding_fallback(monkeypatch):
     class VectorStore:
         async def search(self, query, top_k=5):
@@ -542,6 +593,7 @@ async def test_graphrag_skips_empty_community_summaries():
                     ),
                 }
             ]
+
 
     pipeline = GraphRAGPipeline(VectorStore(), Graph())
 
@@ -632,6 +684,34 @@ async def test_graphrag_retrieve_keeps_vector_results_when_graph_branch_fails():
 
     assert [ctx.source_type for ctx in contexts] == ["vector"]
 
+
+
+
+@pytest.mark.asyncio
+async def test_qa_fallback_does_not_generate_cypher_when_graphrag_fails():
+    class VectorStore:
+        async def search(self, query, top_k=5):
+            return [({"content": "duration risk vector", "source": "risk.md", "metadata": {}}, 0.9)]
+
+    class Graph:
+        cypher_calls = 0
+
+        async def execute_cypher(self, cypher):
+            self.cypher_calls += 1
+            raise AssertionError("LLM-generated Cypher fallback should not run")
+
+    class BrokenGraphRAG:
+        async def retrieve(self, query, top_k=10):
+            raise RuntimeError("graph unavailable")
+
+    graph = Graph()
+    agent = QAAgent(vector_store=VectorStore(), knowledge_graph=graph)
+    agent.graph_rag = BrokenGraphRAG()
+
+    contexts = await agent._retrieve_contexts("duration risk", {"queries": ["duration risk"]})
+
+    assert graph.cypher_calls == 0
+    assert [context.retrieval_type for context in contexts] == ["vector"]
 
 def test_graphrag_subgraph_scores_depend_on_query_relevance():
     strong = GraphRAGPipeline._subgraph_score(

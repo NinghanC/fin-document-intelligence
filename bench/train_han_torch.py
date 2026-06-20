@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -124,6 +125,24 @@ def score_record(
         return float(model(features, metapath_id).item())
 
 
+def wilson_interval(successes: int, total: int, z: float = 1.96) -> list[float]:
+    """95% Wilson score interval for a binomial proportion (top-1 hit rate).
+
+    The eval set here is small (~12 held-out query groups), so a bare point
+    estimate is misleading: a top-1 hit rate of 1.0 on 12 queries is weak
+    evidence, not proof. A bootstrap is useless on a perfect result (every
+    resample is all-correct -> [1.0, 1.0]), but the Wilson interval stays honest:
+    12/12 yields roughly [0.76, 1.0], exposing the small-sample uncertainty.
+    """
+    if total <= 0:
+        return [0.0, 0.0]
+    phat = successes / total
+    denom = 1.0 + z * z / total
+    center = (phat + z * z / (2 * total)) / denom
+    margin = z * math.sqrt((phat * (1.0 - phat) + z * z / (4 * total)) / total) / denom
+    return [round(max(0.0, center - margin), 3), round(min(1.0, center + margin), 3)]
+
+
 def evaluate_torch_han_ranker(
     records: list[Record],
     model: TorchHANRanker,
@@ -169,9 +188,17 @@ def evaluate_torch_han_ranker(
     return {
         "queries": len(groups),
         "torch_top1_hit_rate": round(torch_top1 / total, 3),
+        "torch_top1_ci95": wilson_interval(torch_top1, total),
         "rule_top1_hit_rate": round(rule_top1 / total, 3),
+        "rule_top1_ci95": wilson_interval(rule_top1, total),
         "torch_mrr": round(torch_mrr / total, 3),
         "rule_mrr": round(rule_mrr / total, 3),
+        "small_sample_warning": (
+            f"only {len(groups)} held-out query groups; treat point estimates as "
+            "directional, not significant"
+            if len(groups) < 30
+            else None
+        ),
         "rows": rows,
     }
 

@@ -56,6 +56,51 @@ def create_chat_model() -> Any:
 
 
 
+# HTTP statuses that signal a permanent client/configuration error: retrying or
+# returning a fabricated demo answer can never turn these into a correct result.
+_FATAL_HTTP_STATUS = {400, 401, 403, 404, 405, 422}
+_FATAL_ERROR_NAME_HINTS = (
+    "authentication",
+    "permissiondenied",
+    "notfound",
+    "badrequest",
+    "invalidrequest",
+    "unprocessable",
+)
+
+
+def _http_status_of(exc: Exception) -> int | None:
+    """Best-effort extraction of an HTTP status from provider SDK exceptions."""
+    for attr in ("status_code", "http_status"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, int):
+            return value
+    response = getattr(exc, "response", None)
+    # OpenAI/httpx-style: response.status_code
+    status = getattr(response, "status_code", None)
+    if isinstance(status, int):
+        return status
+    # botocore ClientError-style: response["ResponseMetadata"]["HTTPStatusCode"]
+    if isinstance(response, dict):
+        code = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+        if isinstance(code, int):
+            return code
+    return None
+
+
+def _is_fatal_model_error(exc: Exception) -> bool:
+    """True for errors that will never succeed on retry (auth, bad request, etc.).
+
+    These must be surfaced rather than retried or masked by the demo fallback, so a
+    misconfigured key or malformed request does not silently return fake answers.
+    """
+    status = _http_status_of(exc)
+    if status is not None:
+        return status in _FATAL_HTTP_STATUS
+    name = type(exc).__name__.lower()
+    return any(hint in name for hint in _FATAL_ERROR_NAME_HINTS)
+
+
 @dataclass
 class ResilientChatModel:
     """Adds timeout, retry, and optional demo fallback around chat models."""
@@ -73,6 +118,17 @@ class ResilientChatModel:
                     timeout=settings.model_call_timeout_seconds,
                 )
             except Exception as exc:
+                # Permanent client/config failures are never fixed by retrying or by
+                # returning a demo answer, so surface them immediately instead of
+                # masking a real outage as a plausible (but fabricated) response.
+                if _is_fatal_model_error(exc):
+                    logger.error(
+                        "model_call_fatal",
+                        provider=settings.model_provider,
+                        error=str(exc),
+                        error_type=type(exc).__name__,
+                    )
+                    raise
                 last_error = exc
                 logger.warning(
                     "model_call_failed",

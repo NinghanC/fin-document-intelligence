@@ -144,12 +144,32 @@ async def request_context_middleware(request: Request, call_next):
     return response
 
 
+def _get_client_id(request: Request) -> str:
+    """Extract the real client IP, respecting proxy headers when trusted.
+
+    Behind a reverse proxy (nginx, ALB, CloudFront), request.client.host is the
+    proxy IP, so every user would share one rate-limit bucket. When
+    trust_proxy_headers is enabled we instead key on the forwarded client IP.
+    """
+    if settings.trust_proxy_headers:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            # First IP in the chain is the original client.
+            return forwarded.split(",")[0].strip()
+
+        real_ip = request.headers.get("x-real-ip")
+        if real_ip:
+            return real_ip.strip()
+
+    return request.client.host if request.client else "unknown"
+
+
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     if request.url.path.startswith("/static"):
         return await call_next(request)
 
-    client = request.client.host if request.client else "unknown"
+    client = _get_client_id(request)
     allowed = await api_state_store.allow_request(
         client,
         settings.rate_limit_requests,
@@ -283,6 +303,25 @@ def _validate_upload_content(filename: str, content: bytes) -> None:
             content.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise HTTPException(status_code=400, detail="Text uploads must be UTF-8") from exc
+
+
+def _resolve_within_upload_dir(raw_path: str) -> str:
+    """Resolve a client-supplied path and confirm it stays inside the upload dir.
+
+    The admin update/CDC endpoints accept a path to (re)ingest a document. Without
+    this guard an authenticated caller could point ingestion at any file the process
+    can read (e.g. .env, secrets, /etc/passwd), whose contents would then be parsed,
+    embedded, and exposed through QA retrieval — a path-traversal / arbitrary-file
+    read. Absolute paths and ``..`` escapes both resolve outside the root and are
+    rejected here.
+    """
+    if not raw_path or not raw_path.strip():
+        raise HTTPException(status_code=400, detail="Path is required")
+    upload_root = os.path.abspath(settings.upload_dir)
+    candidate = os.path.abspath(os.path.join(upload_root, raw_path))
+    if candidate != upload_root and not candidate.startswith(upload_root + os.sep):
+        raise HTTPException(status_code=400, detail="Path must be within the upload directory")
+    return candidate
 
 
 async def _save_upload(file: UploadFile) -> tuple[str, str]:
@@ -471,7 +510,7 @@ async def trigger_update(req: UpdateRequest):
         raise HTTPException(status_code=503, detail="Update workflow not initialized")
 
     change = DocumentChange(
-        file_path=req.file_path,
+        file_path=_resolve_within_upload_dir(req.file_path),
         change_type=ChangeType(req.change_type),
     )
     result = await update_wf.ainvoke({"changes": [change]})
@@ -494,11 +533,12 @@ async def trigger_update(req: UpdateRequest):
 @app.post("/api/admin/cdc/events", tags=["System Administration"], dependencies=[Depends(require_api_key)])
 async def process_cdc_event(req: CDCEventRequest):
     """Process a normalized CDC event through the incremental CDC processor."""
+    resource_path = _resolve_within_upload_dir(req.resource_path)
     event = CDCEvent(
-        event_id=f"api-{req.resource_path}-{req.operation}",
+        event_id=f"api-{resource_path}-{req.operation}",
         source_type="api",
         operation=req.operation.upper(),
-        resource_path=req.resource_path,
+        resource_path=resource_path,
         before=req.before,
         after=req.after,
     )

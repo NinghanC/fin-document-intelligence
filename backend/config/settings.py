@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080"
     rate_limit_requests: int = 60
     rate_limit_window_seconds: int = 60
+    # Trust X-Forwarded-For / X-Real-IP for rate-limit client identity.
+    # Enable ONLY behind a proxy that strips/rewrites these headers; in direct
+    # mode any client could spoof them to bypass rate limiting.
+    trust_proxy_headers: bool = False
     max_upload_size_mb: int = 10
     batch_upload_concurrency: int = 4
     api_state_backend: str = "memory"  # memory | postgres
