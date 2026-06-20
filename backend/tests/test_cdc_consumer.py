@@ -82,7 +82,7 @@ async def test_failing_event_is_retried_then_dropped_not_silently_committed(monk
     msg = FakeMessage(_VALID, offset=7)
     retry_counts: dict = {}
 
-    for attempt in range(1, 4):
+    for _attempt in range(1, 4):
         action = await processor._consume_message(consumer, msg, retry_counts, max_retries=3)
         assert action == "retry"
     # never committed while still retrying -> message survives a restart

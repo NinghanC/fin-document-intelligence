@@ -17,7 +17,15 @@
       "PowerShell(cd C:\\\\Git\\\\document-intelligence\\\\backend; $bt=\"C:\\\\Git\\\\document-intelligence\\\\.pytmp\"; $env:TMP=$bt; $env:TEMP=$bt; & \"C:\\\\Git\\\\document-intelligence\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest tests/test_demo_flows.py -p no:cacheprovider -q --basetemp=\"$bt\\\\pt\" 2>&1 | Select-Object -Last 12)",
       "PowerShell(cd C:\\\\Git\\\\document-intelligence\\\\backend; $bt=\"C:\\\\Git\\\\document-intelligence\\\\.pytmp\"; $env:TMP=$bt; $env:TEMP=$bt; & \"C:\\\\Git\\\\document-intelligence\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest tests/test_security_and_api.py -p no:cacheprovider -q --basetemp=\"$bt\\\\pt\" -k \"fences or untrusted\" 2>&1 | Select-Object -Last 20)",
       "PowerShell(cd C:\\\\Git\\\\document-intelligence\\\\backend; $bt=\"C:\\\\Git\\\\document-intelligence\\\\.pytmp\"; $env:TMP=$bt; $env:TEMP=$bt; & \"C:\\\\Git\\\\document-intelligence\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest tests/test_security_and_api.py -p no:cacheprovider -q --basetemp=\"$bt\\\\pt\" -k \"fences or untrusted\" 2>&1 | Select-Object -Last 8)",
-      "PowerShell(cd C:\\\\Git\\\\document-intelligence\\\\backend; $bt=\"C:\\\\Git\\\\document-intelligence\\\\.pytmp\"; $env:TMP=$bt; $env:TEMP=$bt; & \"C:\\\\Git\\\\document-intelligence\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest -p no:cacheprovider -q --basetemp=\"$bt\\\\pt\" 2>&1 | Select-Object -Last 25)"
+      "PowerShell(cd C:\\\\Git\\\\document-intelligence\\\\backend; $bt=\"C:\\\\Git\\\\document-intelligence\\\\.pytmp\"; $env:TMP=$bt; $env:TEMP=$bt; & \"C:\\\\Git\\\\document-intelligence\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest -p no:cacheprovider -q --basetemp=\"$bt\\\\pt\" 2>&1 | Select-Object -Last 25)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8080/api/health)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8080/api/admin/stats)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -H \"X-API-Key: dev-local-secret\" http://localhost:8080/api/admin/stats)",
+      "Bash(docker exec *)",
+      "Bash(docker compose *)",
+      "Bash(docker-compose version *)",
+      "Bash(curl -s http://localhost:8080/api/admin/stats)",
+      "Bash(docker inspect *)"
     ]
   }
 }
