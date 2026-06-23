@@ -34,12 +34,10 @@ class Settings(BaseSettings):
     chroma_port: int = 8000
     chroma_lexical_scan_limit: int = 5000
     pgvector_dsn: str = "postgresql://postgres:postgres@localhost:5432/knowledge"
-    disable_local_embeddings: bool = False
 
     # Kafka (CDC)
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_topic_doc_changes: str = "doc-changes"
-    kafka_topic_kg_updates: str = "kg-updates"
     enable_cdc_consumer: bool = False
 
     # API

@@ -332,8 +332,15 @@ class CDCProcessor:
             "UPDATE": ChangeType.MODIFIED,
             "MODIFY": ChangeType.MODIFIED,
             "DELETE": ChangeType.DELETED,
+            "C": ChangeType.CREATED,
+            "R": ChangeType.CREATED,
+            "U": ChangeType.MODIFIED,
+            "D": ChangeType.DELETED,
         }
-        change_type = operation_map.get(event.operation.upper(), ChangeType.MODIFIED)
+        operation = event.operation.upper()
+        if operation not in operation_map:
+            raise ValueError(f"Unsupported CDC operation: {event.operation}")
+        change_type = operation_map[operation]
         change = DocumentChange(file_path=event.resource_path, change_type=change_type)
         return await self._update_handler(change)
 

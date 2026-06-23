@@ -1,7 +1,7 @@
 """Train a small PyTorch HAN-style metapath attention ranker offline.
 
-This consumes the same HAN-ready artifacts as train_han_attention.py, but uses a
-PyTorch model with learned metapath embeddings and an attention gate between
+This consumes HAN-ready artifacts and uses a PyTorch model with learned
+metapath embeddings and an attention gate between
 query/metapath features and metapath identity. It is intentionally kept in
 bench/ and is not wired into the runtime retrieval path.
 
@@ -22,7 +22,6 @@ BENCH = Path(__file__).resolve().parent
 if str(BENCH) not in sys.path:
     sys.path.insert(0, str(BENCH))
 
-import train_han_attention as han_baseline  # noqa: E402
 import train_metapath_ranker as ranker  # noqa: E402
 
 try:
@@ -34,15 +33,57 @@ except ImportError as exc:  # pragma: no cover - exercised only without optional
 Record = dict[str, Any]
 
 
+def _read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_han_context(han_dir: Path) -> dict[str, Any]:
+    labels = [
+        json.loads(line)
+        for line in (han_dir / "query_metapath_labels.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    adjacency = {path.stem: _read_json(path) for path in (han_dir / "adjacency_by_metapath").glob("*.json")}
+    return {
+        "entities": {entity["id"]: entity for entity in _read_json(han_dir / "entities.json")},
+        "metapaths": {metapath["name"]: metapath for metapath in _read_json(han_dir / "metapaths.json")},
+        "labels": {label["query_id"]: label for label in labels},
+        "adjacency": adjacency,
+    }
+
+
+def _path_instances_for_record(record: Record, han_context: dict[str, Any]) -> list[dict[str, Any]]:
+    label = han_context["labels"].get(record["query_id"], {})
+    start_ids = set(label.get("start_entity_ids", []))
+    candidate = str(record["candidate_metapath"])
+    return [
+        instance for instance in han_context["adjacency"].get(candidate, [])
+        if instance.get("start_entity_id") in start_ids
+    ]
+
+
+def han_features(record: Record, han_context: dict[str, Any]) -> dict[str, float]:
+    instances = _path_instances_for_record(record, han_context)
+    path_count = len(instances)
+    base = ranker.vectorize(record)
+    base.update({
+        "han_path_instance_count": float(path_count),
+        "han_log_path_instance_count": math.log1p(path_count),
+        "han_reachable_end_count": float(len({instance.get("end_entity_id") for instance in instances})),
+        "han_has_reachable_path": 1.0 if path_count else 0.0,
+    })
+    return base
+
+
 def _feature_vector(record: Record, han_context: dict[str, Any], feature_names: list[str]) -> list[float]:
-    values = han_baseline.han_features(record, han_context)
+    values = han_features(record, han_context)
     return [float(values.get(name, 0.0)) for name in feature_names]
 
 
 def build_feature_names(records: list[Record], han_context: dict[str, Any]) -> list[str]:
     names: set[str] = set()
     for record in records:
-        names.update(han_baseline.han_features(record, han_context))
+        names.update(han_features(record, han_context))
     return sorted(names)
 
 
@@ -255,7 +296,7 @@ def main() -> None:
 
     records = ranker.load_jsonl(Path(args.training))
     train_records, eval_records = ranker.split_records(records, args.train_dataset, args.eval_dataset)
-    han_context = han_baseline.load_han_context(Path(args.han_dir))
+    han_context = load_han_context(Path(args.han_dir))
     model, feature_names, metapath_ids = train_torch_han_ranker(
         train_records,
         han_context,

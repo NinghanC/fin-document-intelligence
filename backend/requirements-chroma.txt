@@ -1,0 +1,4 @@
+# Optional embedded/local ChromaDB client.
+# On Windows, chroma-hnswlib may require Microsoft C++ Build Tools.
+-r requirements.txt
+chromadb==0.6.3

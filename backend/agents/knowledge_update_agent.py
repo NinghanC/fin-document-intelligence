@@ -18,8 +18,6 @@ from typing import Any
 
 import structlog
 
-from config import settings
-
 logger = structlog.get_logger("finsight.knowledge_update")
 
 
@@ -203,42 +201,6 @@ class KnowledgeUpdateAgent:
             self._watch_thread.join(timeout=5)
         self._watch_thread = None
 
-    # kafka CDC mode
-    async def start_kafka_consumer(self) -> None:
-        """Start the Kafka CDC consumer"""
-        import json
-
-        from confluent_kafka import Consumer
-
-        conf = {
-            "bootstrap.servers": settings.kafka_bootstrap_servers,
-            "group.id": "knowledge-update-agent",
-            "auto.offset.reset": "latest",
-        }
-        consumer = Consumer(conf)
-        consumer.subscribe([settings.kafka_topic_doc_changes])
-
-        try:
-            while True:
-                msg = consumer.poll(timeout=1.0)
-                if msg is None:
-                    continue
-                if msg.error():
-                    continue
-                value = msg.value()
-                if value is None:
-                    continue
-                payload = json.loads(value.decode("utf-8"))
-                change = DocumentChange(
-                    file_path=payload["file_path"],
-                    change_type=ChangeType(payload["change_type"]),
-                    old_hash=payload.get("old_hash", ""),
-                    new_hash=payload.get("new_hash", ""),
-                )
-                await self.process_change(change)
-        finally:
-            consumer.close()
-
     # internal handlers
     async def _handle_create(self, change: DocumentChange, result: UpdateResult) -> None:
         if not self.doc_parser:
@@ -266,6 +228,9 @@ class KnowledgeUpdateAgent:
         if self.vector_store:
             deleted = await self.vector_store.delete_by_doc_id(doc_id)
             result.vectors_deleted = deleted
+
+        if self.knowledge_graph:
+            await self.knowledge_graph.delete_by_source(change.file_path)
 
         await self._handle_create(change, result)
 

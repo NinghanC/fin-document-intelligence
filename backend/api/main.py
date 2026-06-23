@@ -263,7 +263,7 @@ class StatsResponse(BaseModel):
 
 class UpdateRequest(BaseModel):
     file_path: str
-    change_type: str = "modified"
+    change_type: ChangeType = ChangeType.MODIFIED
 
 
 class UpdateResponse(BaseModel):
@@ -511,7 +511,7 @@ async def trigger_update(req: UpdateRequest):
 
     change = DocumentChange(
         file_path=_resolve_within_upload_dir(req.file_path),
-        change_type=ChangeType(req.change_type),
+        change_type=req.change_type,
     )
     result = await update_wf.ainvoke({"changes": [change]})
     results = result.get("results", [])

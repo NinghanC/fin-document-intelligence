@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import csv
 import json
 import sys
 from pathlib import Path
@@ -22,31 +23,110 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from agents.knowledge_extract_agent import Entity, Relation  # noqa: E402
-from services.knowledge_graph import KnowledgeGraphService  # noqa: E402
-from services.metapaths import FINANCIAL_METAPATHS, MetapathRouter  # noqa: E402
+from services.metapaths import FINANCIAL_METAPATHS, MetapathResult, MetapathRouter, MetapathSpec  # noqa: E402
 
 
 def _load_dataset(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-async def _build_graph(dataset: dict[str, Any]) -> KnowledgeGraphService:
-    graph = KnowledgeGraphService()
+def _read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _read_questions(path: Path) -> list[dict[str, Any]]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+class _EvalGraph:
+    def __init__(self) -> None:
+        self.entities: dict[str, str] = {}
+        self.relations: list[tuple[str, str, str]] = []
+
+    async def upsert_entity(self, name: str, entity_type: str) -> None:
+        self.entities[name] = entity_type
+
+    async def add_relation(self, head: str, relation: str, tail: str) -> None:
+        self.relations.append((head, relation.lower(), tail))
+
+    async def traverse_metapath(
+        self,
+        start_entities: list[str],
+        metapath: MetapathSpec,
+        limit: int = 20,
+    ) -> list[MetapathResult]:
+        results: list[MetapathResult] = []
+        for start in start_entities:
+            states: list[tuple[str, list[tuple[str, str, str]]]] = [(start, [])]
+            for step in metapath.steps:
+                next_states: list[tuple[str, list[tuple[str, str, str]]]] = []
+                for current, path in states:
+                    if self.entities.get(current) != step.from_type:
+                        continue
+                    for head, relation, tail in self.relations:
+                        if relation != step.relation:
+                            continue
+                        if step.direction == "out" and head == current and self.entities.get(tail) == step.to_type:
+                            next_states.append((tail, [*path, (head, relation.upper(), tail)]))
+                        elif step.direction == "in" and tail == current and self.entities.get(head) == step.to_type:
+                            next_states.append((head, [*path, (tail, relation.upper(), head)]))
+                states = next_states
+                if not states:
+                    break
+            for end, path in states:
+                results.append(MetapathResult(
+                    metapath_name=metapath.name,
+                    start_entity=start,
+                    end_entity=end,
+                    path=tuple(path),
+                    evidence=" -> ".join(f"{head}-[{rel}]->{tail}" for head, rel, tail in path),
+                    score=1.0,
+                ))
+                if len(results) >= limit:
+                    return results
+        return results
+
+
+async def _build_graph(dataset: dict[str, Any] | list[dict[str, str]]) -> _EvalGraph:
+    graph = _EvalGraph()
+    if isinstance(dataset, list):
+        managers = sorted({row["manager"] for row in dataset})
+        companies = sorted({row["company"] for row in dataset})
+        sectors = sorted({row["sector"] for row in dataset})
+        regions = sorted({row["region"] for row in dataset})
+
+        for manager in managers:
+            await graph.upsert_entity(manager, "Fund")
+        for company in companies:
+            await graph.upsert_entity(company, "Company")
+        for sector in sectors:
+            await graph.upsert_entity(sector, "Sector")
+        for region in regions:
+            await graph.upsert_entity(region, "Region")
+
+        seen_relations: set[tuple[str, str, str]] = set()
+        for row in dataset:
+            for head, relation, tail in (
+                (row["manager"], "holds", row["company"]),
+                (row["company"], "belongs_to", row["sector"]),
+                (row["company"], "located_in", row["region"]),
+            ):
+                key = (head, relation, tail)
+                if key not in seen_relations:
+                    seen_relations.add(key)
+                    await graph.add_relation(head, relation, tail)
+        return graph
+
     for item in dataset["entities"]:
-        await graph.upsert_entity(Entity(name=item["name"], type=item["type"]))
+        await graph.upsert_entity(item["name"], item["type"])
     for item in dataset["relations"]:
-        await graph.add_relation(Relation(
-            head=item["head"],
-            relation=item["relation"],
-            tail=item["tail"],
-            confidence=float(item.get("confidence", 1.0)),
-        ))
+        await graph.add_relation(item["head"], item["relation"], item["tail"])
     return graph
 
 
 async def _traverse_selected(
-    graph: KnowledgeGraphService,
+    graph: _EvalGraph,
     start_entities: list[str],
     metapath_names: list[str],
 ) -> tuple[list[str], dict[str, list[str]]]:
@@ -60,12 +140,16 @@ async def _traverse_selected(
     return sorted(reached), reached_by_metapath
 
 
-async def _evaluate(dataset: dict[str, Any]) -> dict[str, Any]:
-    graph = await _build_graph(dataset)
+async def _evaluate_questions(
+    graph_data: dict[str, Any] | list[dict[str, str]],
+    questions: list[dict[str, Any]],
+    result_prefix: dict[str, Any],
+) -> dict[str, Any]:
+    graph = await _build_graph(graph_data)
     router = MetapathRouter()
     rows: list[dict[str, Any]] = []
 
-    for item in dataset["questions"]:
+    for item in questions:
         selections = router.select_with_trace(item["question"], item["start_entities"], limit=3)
         selected_names = [selection.spec.name for selection in selections]
         expected_metapath = item["expected_metapath"]
@@ -110,8 +194,7 @@ async def _evaluate(dataset: dict[str, Any]) -> dict[str, Any]:
     average_routed_recall = sum(float(row["routed_path_recall"]) for row in rows) / max(total, 1)
     average_oracle_recall = sum(float(row["oracle_path_recall"]) for row in rows) / max(total, 1)
     return {
-        "dataset": "finance_metapath_synthetic",
-        "total": total,
+        **result_prefix,
         "router_hits": router_hits,
         "router_hit_rate": round(router_hits / max(total, 1), 3),
         "router_top1_hit_rate": round(router_top1_hits / max(total, 1), 3),
@@ -129,13 +212,36 @@ async def _evaluate(dataset: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+async def _evaluate(dataset: dict[str, Any]) -> dict[str, Any]:
+    return await _evaluate_questions(
+        dataset,
+        dataset["questions"],
+        {"dataset": "finance_metapath_synthetic", "total": len(dataset["questions"])},
+    )
+
+
+async def _evaluate_real_holdings(rows: list[dict[str, str]], questions: list[dict[str, Any]]) -> dict[str, Any]:
+    return await _evaluate_questions(
+        rows,
+        questions,
+        {"dataset": "real_13f_style_holdings_sample", "holdings_rows": len(rows), "questions": len(questions)},
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
+    root = Path(__file__).with_name("real_holdings")
+    parser.add_argument("--kind", choices=["synthetic", "real-holdings"], default="synthetic")
     parser.add_argument("--dataset", default=str(Path(__file__).with_name("metapath_dataset.json")))
+    parser.add_argument("--holdings", default=str(root / "holdings_sample.csv"))
+    parser.add_argument("--questions", default=str(root / "questions.json"))
     parser.add_argument("--show-rows", action="store_true")
     args = parser.parse_args()
 
-    result = asyncio.run(_evaluate(_load_dataset(Path(args.dataset))))
+    if args.kind == "real-holdings":
+        result = asyncio.run(_evaluate_real_holdings(_read_csv(Path(args.holdings)), _read_questions(Path(args.questions))))
+    else:
+        result = asyncio.run(_evaluate(_load_dataset(Path(args.dataset))))
     if not args.show_rows:
         result = {key: value for key, value in result.items() if key != "rows"}
     print(json.dumps(result, indent=2))

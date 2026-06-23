@@ -107,5 +107,24 @@ async def test_unparseable_message_is_skipped_not_fatal():
     assert consumer.committed == [msg]
 
 
+@pytest.mark.asyncio
+async def test_unsupported_operation_fails_without_calling_handler():
+    calls = 0
+
+    async def handler(_change):
+        nonlocal calls
+        calls += 1
+
+    processor = CDCProcessor(update_handler=handler)
+    event = CDCProcessor.from_filesystem_event("modified", "fund.txt")
+    event.operation = "BOGUS"
+
+    result = await processor.process_event(event)
+
+    assert result.success is False
+    assert "Unsupported CDC operation" in result.error
+    assert calls == 0
+
+
 async def _no_sleep(_seconds):
     return None

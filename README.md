@@ -452,16 +452,15 @@ For that reason, the benchmark keeps a `weighted-grid` mode as an experiment, no
 The `bench/` directory includes evaluation scaffolds for expected-source checks, retrieval hit rate, and future recall@k reporting on a labeled retrieval set:
 
 ```bash
-python bench/run_graphrag_eval.py --mode rrf
-python bench/run_graphrag_eval.py --mode weighted-grid
-python bench/run_graphrag_eval.py --mode both
+python bench/run_eval.py --mode rrf
+python bench/run_eval.py --mode weighted-grid
+python bench/run_eval.py --mode both
 python bench/run_metapath_eval.py
-python bench/run_real_holdings_eval.py
+python bench/run_metapath_eval.py --kind real-holdings
 python bench/export_metapath_training_data.py
 python bench/export_han_data.py
 python bench/han_readiness_report.py
 python bench/train_metapath_ranker.py
-python bench/train_han_attention.py
 pip install -r bench/requirements-han.txt
 python bench/train_han_torch.py --output bench/results/han_torch_eval.json --model-output bench/results/han_torch_model.pt
 ```
@@ -476,7 +475,7 @@ Portfolio -> holds -> Company -> located_in -> Region
 Company -> belongs_to -> Sector <- belongs_to <- Company
 ```
 
-`run_metapath_eval.py` and `run_real_holdings_eval.py` build in-memory graphs, run `MetapathRouter`, and report routed and oracle path metrics separately:
+`run_metapath_eval.py` builds in-memory graphs for both the synthetic and real-holdings benchmarks, runs `MetapathRouter`, and reports routed and oracle path metrics separately. Use `--kind real-holdings` for the public 13F-style sample:
 
 - router hit rate: whether the rule router selected the expected metapath anywhere in its candidate set
 - router top-1 hit rate: whether the expected metapath was the first selected path
@@ -494,9 +493,7 @@ This split avoids circular scoring. Oracle traversal validates graph data and ty
 
 `han_readiness_report.py` is the decision gate before implementing HAN. It checks the training JSONL, HAN artifacts, metapath label coverage, train/eval split size, and whether the lightweight learned ranker is at least as good as the rule router. With the current defaults (`min_queries=50`, `min_eval_queries=10`), the report now returns `ready_for_han=true`: the dataset has 62 labeled queries, including 12 held-out real-holdings questions, and all eight metapaths have positive labels. This means the repo is ready for a small offline HAN prototype with held-out evaluation; it is still not a production neural ranking claim until the labeled set is expanded and the HAN model beats the transparent learned-ranker baseline.
 
-`train_han_attention.py` is that small offline prototype. It is dependency-free and HAN-style rather than a full neural HAN: it combines the pairwise query/metapath features with graph path-instance features from `adjacency_by_metapath/*.json`, then trains a pairwise attention scorer offline. On the current held-out real-holdings split it reports `attention_top1_hit_rate=1.0` versus `rule_top1_hit_rate=0.667`, and `attention_mrr=1.0` versus `rule_mrr=0.833`. The output also surfaces graph-derived weights such as `han_has_reachable_path` and `han_log_path_instance_count`, which confirms the prototype is using the HAN-ready graph artifacts rather than only keyword routing.
-
-`train_han_torch.py` is the optional PyTorch version. Install the bench-only dependency with `pip install -r bench/requirements-han.txt`, then run `python bench/train_han_torch.py`. The model learns metapath embeddings plus an attention gate over query/metapath features and graph-path features, while remaining offline and outside the API runtime. On the current held-out real-holdings split it reports `torch_top1_hit_rate=1.0` versus `rule_top1_hit_rate=0.667`, and `torch_mrr=1.0` versus `rule_mrr=0.833`; the output includes attention-gate and metapath-embedding diagnostics so the neural component is inspectable instead of a black-box claim.
+`train_han_torch.py` is the optional PyTorch HAN-style prototype. Install the bench-only dependency with `pip install -r bench/requirements-han.txt`, then run `python bench/train_han_torch.py`. The model learns metapath embeddings plus an attention gate over query/metapath features and graph-path features, while remaining offline and outside the API runtime. On the current held-out real-holdings split it reports `torch_top1_hit_rate=1.0` versus `rule_top1_hit_rate=0.667`, and `torch_mrr=1.0` versus `rule_mrr=0.833`; the output includes attention-gate and metapath-embedding diagnostics so the neural component is inspectable instead of a black-box claim.
 
 This complements the public-document API benchmark. The public filings test source and evidence retrieval only; the synthetic metapath benchmark tests full graph-pattern coverage; the real-holdings benchmark tests whether those patterns work on a public-finance data shape.
 
@@ -515,7 +512,7 @@ python bench/run_live_eval.py \
   --output bench/live_eval/results.local.json
 ```
 
-`bench/live_eval/questions.json` is scoped to provider-backed answer grounding. It contains public filing questions, table-grounded questions, and insufficient-evidence cases with expected source files, expected evidence terms, and expected answer points. It intentionally excludes graph-inference/metapath questions; those are measured by `run_metapath_eval.py` and `run_real_holdings_eval.py`, where path reachability and end-entity recall are the primary metrics.
+`bench/live_eval/questions.json` is scoped to provider-backed answer grounding. It contains public filing questions, table-grounded questions, and insufficient-evidence cases with expected source files, expected evidence terms, and expected answer points. It intentionally excludes graph-inference/metapath questions; those are measured by `run_metapath_eval.py`, where path reachability and end-entity recall are the primary metrics.
 
 The live runner reports:
 
@@ -839,6 +836,14 @@ cd backend
 pip install -r requirements.txt
 uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload
 ```
+
+For embedded/local ChromaDB mode, install the optional Chroma dependency:
+
+```bash
+pip install -r requirements-chroma.txt
+```
+
+On Windows, Chroma's native `chroma-hnswlib` dependency may require Microsoft C++ Build Tools. Docker Compose uses a ChromaDB service, so local Python installs can usually stay on the base requirements unless you need `CHROMA_MODE=local`.
 
 The subprocess `EmbeddingWorker` is optional. Install it only when you want `EMBEDDING_PROVIDER=local`:
 

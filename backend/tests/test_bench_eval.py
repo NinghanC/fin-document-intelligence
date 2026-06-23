@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 
 
-def load_graphrag_eval_module():
-    module_path = Path(__file__).resolve().parents[2] / "bench" / "run_graphrag_eval.py"
-    spec = importlib.util.spec_from_file_location("run_graphrag_eval", module_path)
+def load_eval_module():
+    module_path = Path(__file__).resolve().parents[2] / "bench" / "run_eval.py"
+    spec = importlib.util.spec_from_file_location("run_eval", module_path)
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -25,16 +25,6 @@ def load_metapath_eval_module():
     return module
 
 
-def load_real_holdings_eval_module():
-    module_path = Path(__file__).resolve().parents[2] / "bench" / "run_real_holdings_eval.py"
-    spec = importlib.util.spec_from_file_location("run_real_holdings_eval", module_path)
-    assert spec is not None
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
-
-
 def load_metapath_training_export_module():
     module_path = Path(__file__).resolve().parents[2] / "bench" / "export_metapath_training_data.py"
     spec = importlib.util.spec_from_file_location("export_metapath_training_data", module_path)
@@ -43,18 +33,6 @@ def load_metapath_training_export_module():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
-
-
-
-def load_han_attention_module():
-    module_path = Path(__file__).resolve().parents[2] / "bench" / "train_han_attention.py"
-    spec = importlib.util.spec_from_file_location("train_han_attention", module_path)
-    assert spec is not None
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
-
 
 def load_han_torch_module():
     module_path = Path(__file__).resolve().parents[2] / "bench" / "train_han_torch.py"
@@ -100,7 +78,7 @@ def load_live_eval_module():
     spec.loader.exec_module(module)
     return module
 def test_weighted_grid_reports_best_branch_boost():
-    module = load_graphrag_eval_module()
+    module = load_eval_module()
     questions = [
         {
             "question": "Which fund mentions liquidity?",
@@ -126,7 +104,7 @@ def test_weighted_grid_reports_best_branch_boost():
 
 
 def test_graphrag_eval_default_output_excludes_answer_text_scoring():
-    module = load_graphrag_eval_module()
+    module = load_eval_module()
     questions = [
         {
             "question": "What liquidity coverage ratio did JPMorgan report?",
@@ -158,7 +136,7 @@ def test_graphrag_eval_default_output_excludes_answer_text_scoring():
 
 
 def test_graphrag_eval_answer_smoke_is_explicit_opt_in():
-    module = load_graphrag_eval_module()
+    module = load_eval_module()
     questions = [
         {
             "question": "What liquidity coverage ratio did JPMorgan report?",
@@ -227,12 +205,12 @@ def test_metapath_eval_dataset_reaches_expected_paths():
 
 
 def test_real_holdings_eval_dataset_reaches_expected_paths():
-    module = load_real_holdings_eval_module()
+    module = load_metapath_eval_module()
     root = Path(__file__).resolve().parents[2] / "bench" / "real_holdings"
 
     rows = module._read_csv(root / "holdings_sample.csv")
     questions = module._read_questions(root / "questions.json")
-    result = module.asyncio.run(module._evaluate(rows, questions))
+    result = module.asyncio.run(module._evaluate_real_holdings(rows, questions))
 
     assert result["holdings_rows"] >= 20
     assert result["questions"] >= 8
@@ -306,37 +284,6 @@ def test_han_export_builds_graph_artifacts(tmp_path):
     assert artifacts["adjacency_by_metapath"]["sector_exposure"]
     assert artifacts["adjacency_by_metapath"]["shared_sector"]
 
-def test_han_attention_baseline_uses_graph_artifacts(tmp_path):
-    export_module = load_metapath_training_export_module()
-    han_export_module = load_han_export_module()
-    attention_module = load_han_attention_module()
-    root = Path(__file__).resolve().parents[2]
-    synthetic = json.loads((root / "bench" / "metapath_dataset.json").read_text(encoding="utf-8"))
-    real_questions = json.loads((root / "bench" / "real_holdings" / "questions.json").read_text(encoding="utf-8"))
-    real_rows = export_module._read_csv(root / "bench" / "real_holdings" / "holdings_sample.csv")
-
-    records = export_module.build_training_records(synthetic, real_questions, real_rows)
-    training_path = tmp_path / "metapath_training.jsonl"
-    export_module.write_jsonl(records, training_path)
-    artifacts = han_export_module.build_han_artifacts(synthetic, real_rows, real_questions)
-    han_export_module.write_han_artifacts(artifacts, tmp_path)
-
-    train_records, eval_records = attention_module.ranker.split_records(
-        attention_module.ranker.load_jsonl(training_path),
-        "synthetic_finance_graph",
-        "real_13f_style_holdings",
-    )
-    han_context = attention_module.load_han_context(tmp_path)
-    weights = attention_module.train_attention_ranker(train_records, han_context, epochs=40, learning_rate=0.02)
-    result = attention_module.evaluate_attention_ranker(eval_records, weights, han_context)
-    weight_names = {item["feature"] for item in attention_module.top_weights(weights, limit=20)}
-
-    assert result["queries"] == len(real_questions)
-    assert result["attention_top1_hit_rate"] >= result["rule_top1_hit_rate"]
-    assert result["attention_mrr"] >= result["rule_mrr"]
-    assert "han_has_reachable_path" in weight_names or "han_log_path_instance_count" in weight_names
-
-
 def test_torch_han_ranker_uses_optional_pytorch_and_graph_artifacts(tmp_path):
     pytest.importorskip("torch")
     export_module = load_metapath_training_export_module()
@@ -358,7 +305,7 @@ def test_torch_han_ranker_uses_optional_pytorch_and_graph_artifacts(tmp_path):
         "synthetic_finance_graph",
         "real_13f_style_holdings",
     )
-    han_context = torch_module.han_baseline.load_han_context(tmp_path)
+    han_context = torch_module.load_han_context(tmp_path)
     model, feature_names, metapath_ids = torch_module.train_torch_han_ranker(
         train_records,
         han_context,

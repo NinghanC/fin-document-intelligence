@@ -5,9 +5,11 @@ import time
 import pytest
 from fastapi import HTTPException, UploadFile
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 import api.main as api_main
 from agents.doc_parser_agent import DocType, DocumentChunk
+from agents.knowledge_update_agent import ChangeType
 from agents.knowledge_extract_agent import Entity, ExtractionResult, Relation
 from config.settings import Settings
 from orchestrator.graph import _build_ingest_graph
@@ -140,6 +142,13 @@ def test_settings_enable_auth_by_default():
 
     assert settings.auth_enabled is True
     assert settings.api_key == ""
+
+
+def test_update_request_rejects_invalid_change_type():
+    with pytest.raises(ValidationError):
+        api_main.UpdateRequest(file_path="fund.txt", change_type="bogus")
+
+    assert api_main.UpdateRequest(file_path="fund.txt").change_type == ChangeType.MODIFIED
 
 
 @pytest.mark.asyncio

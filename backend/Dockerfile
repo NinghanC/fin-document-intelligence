@@ -2,8 +2,8 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
-COPY requirements.txt .
-RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+COPY requirements.txt requirements-chroma.txt ./
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements-chroma.txt
 
 FROM python:3.12-slim AS runtime
 

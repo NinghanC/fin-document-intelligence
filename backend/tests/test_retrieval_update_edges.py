@@ -391,6 +391,54 @@ async def test_knowledge_update_create_writes_vectors_and_graph():
     assert result.relations_added == 1
 
 
+@pytest.mark.asyncio
+async def test_knowledge_update_modify_removes_stale_graph_facts(tmp_path):
+    file_path = tmp_path / "fund.txt"
+    file_path.write_text("new", encoding="utf-8")
+    doc_id = DocParserAgent._make_doc_id(str(file_path))
+
+    class Parser:
+        async def parse(self, path):
+            return [DocumentChunk("Global Income Fund liquidity", doc_id, 0, DocType.TEXT, {"source": path})]
+
+    class Extractor:
+        async def extract(self, chunks):
+            return [
+                type(
+                    "Extraction",
+                    (),
+                    {
+                        "entities": [
+                            Entity("Global Income Fund", "Product"),
+                            Entity("liquidity", "Concept"),
+                        ],
+                        "relations": [Relation("Global Income Fund", "related_to", "liquidity")],
+                        "source_chunk_id": f"{doc_id}#chunk-0",
+                    },
+                )()
+            ]
+
+    class VectorStore:
+        async def delete_by_doc_id(self, deleted_doc_id):
+            assert deleted_doc_id == doc_id
+            return 1
+
+        async def add_chunks(self, chunks):
+            return len(chunks)
+
+    graph = KnowledgeGraphService()
+    await graph.upsert_entity(Entity("Global Income Fund", "Product"), source=f"{doc_id}#chunk-0")
+    await graph.upsert_entity(Entity("duration risk", "Concept"), source=f"{doc_id}#chunk-0")
+    await graph.add_relation(Relation("Global Income Fund", "related_to", "duration risk"), source=f"{doc_id}#chunk-0")
+
+    agent = KnowledgeUpdateAgent(Parser(), Extractor(), VectorStore(), graph)
+    result = await agent.process_change(DocumentChange(str(file_path), ChangeType.MODIFIED))
+    neighbors = await graph.get_neighbors("Global Income Fund", hops=1)
+
+    assert result.success is True
+    assert {row["target"] for row in neighbors} == {"liquidity"}
+
+
 def test_cdc_major_change_threshold():
     diff = CDCProcessor.compute_diff("a\nb\nc", "a\nb\nc\nd\ne\nf")
 
