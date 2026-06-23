@@ -9,8 +9,8 @@ from pydantic import ValidationError
 
 import api.main as api_main
 from agents.doc_parser_agent import DocType, DocumentChunk
-from agents.knowledge_update_agent import ChangeType
 from agents.knowledge_extract_agent import Entity, ExtractionResult, Relation
+from agents.knowledge_update_agent import ChangeType
 from config.settings import Settings
 from orchestrator.graph import _build_ingest_graph
 from services.ingestion_registry import ingestion_registry
